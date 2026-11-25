@@ -16,6 +16,7 @@ import {
   VolumeX,
 } from 'lucide-react';
 import Slider from '@/components/ui/Slider';
+import { lyricSyncEngine } from '@/services/lyrics/sync';
 import { useLightingStore } from '@/stores/lightingStore';
 import { usePlayerStore } from '@/stores/playerStore';
 import { useUIStore } from '@/stores/uiStore';
@@ -40,6 +41,7 @@ export function PlayerBar() {
   const repeatMode = usePlayerStore((s) => s.repeatMode);
   const lyrics = usePlayerStore((s) => s.lyrics);
   const currentLyricLine = usePlayerStore((s) => s.currentLyricLine);
+  const currentLyricWord = usePlayerStore((s) => s.currentLyricWord);
 
   const toggle = usePlayerStore((s) => s.toggle);
   const next = usePlayerStore((s) => s.next);
@@ -64,18 +66,29 @@ export function PlayerBar() {
   useEffect(() => {
     const api = window.electronAPI;
     if (!api?.sendMiniPlayerState) return;
-    const activeLyric =
+    const activeLine =
       lyrics && currentLyricLine >= 0 && currentLyricLine < lyrics.lines.length
-        ? lyrics.lines[currentLyricLine]?.text
+        ? lyrics.lines[currentLyricLine]
         : undefined;
+    const syncState = lyricSyncEngine.getCurrentState(currentTime);
+
     api.sendMiniPlayerState({
       title: currentTrack?.title ?? 'No track playing',
       artist: currentTrack?.artist ?? 'Nocturne',
       cover: currentTrack?.cover || undefined,
       isPlaying,
-      lyricLine: activeLyric,
+      lyricLine: activeLine?.text,
+      lyricWords: activeLine?.words?.map((w) => ({
+        text: w.text,
+        startTime: w.time,
+        endTime: w.endTime,
+      })),
+      lyricLineIndex: currentLyricLine,
+      lyricWordIndex: currentLyricWord,
+      lyricLineProgress: syncState.progress,
+      currentTime,
     });
-  }, [currentTrack, isPlaying, lyrics, currentLyricLine]);
+  }, [currentTrack, isPlaying, lyrics, currentLyricLine, currentLyricWord, currentTime]);
 
   // Listen for actions from Floating Mini Player window
   useEffect(() => {
@@ -85,8 +98,12 @@ export function PlayerBar() {
       if (action === 'play-pause') void toggle();
       else if (action === 'next') void next();
       else if (action === 'previous') void prev();
+      else if (action === 'expand') {
+        setMiniPlayerEnabled(false);
+        navigate('/now-playing');
+      }
     });
-  }, [next, prev, toggle]);
+  }, [navigate, next, prev, setMiniPlayerEnabled, toggle]);
 
   const handleToggleMiniPlayer = async () => {
     const nextEnabled = !miniPlayerEnabled;

@@ -40,6 +40,10 @@ export interface PlayerState {
   toggleRepeat: () => void;
   setQueue: (tracks: Track[], startIndex?: number) => void;
   addToQueue: (track: Track | Track[]) => void;
+  playNext: (track: Track | Track[]) => void;
+  reorderQueue: (fromIndex: number, toIndex: number) => void;
+  playQueueIndex: (index: number) => Promise<void>;
+  startSmartMix: (tracks: Track[]) => Promise<void>;
   removeFromQueue: (index: number) => void;
   clearQueue: () => void;
   setLyrics: (lyrics: SyncedLyrics | null) => void;
@@ -173,6 +177,62 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
 
   addToQueue: (track: Track | Track[]) => {
     playbackEngine.addToQueue(track);
+  },
+
+  playNext: (track: Track | Track[]) => {
+    playbackEngine.insertNextInQueue(track);
+  },
+
+  reorderQueue: (fromIndex: number, toIndex: number) => {
+    playbackEngine.reorderQueue(fromIndex, toIndex);
+  },
+
+  playQueueIndex: async (index: number) => {
+    set({ error: null });
+    await playbackEngine.playQueueIndex(index);
+  },
+
+  startSmartMix: async (tracks: Track[]) => {
+    const playable = tracks.filter((t) => t.availability !== 'metadata');
+    if (playable.length === 0) return;
+
+    // Group by primary artist and interleave so same artist doesn't repeat back-to-back
+    const byArtist = new Map<string, Track[]>();
+    for (const t of playable) {
+      const key = (t.artist || 'unknown').toLowerCase().trim();
+      const bucket = byArtist.get(key) ?? [];
+      bucket.push(t);
+      byArtist.set(key, bucket);
+    }
+    const buckets = Array.from(byArtist.values()).map((arr) => {
+      const copy = [...arr];
+      for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+      }
+      return copy;
+    });
+    for (let i = buckets.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [buckets[i], buckets[j]] = [buckets[j], buckets[i]];
+    }
+
+    const mixed: Track[] = [];
+    let added = true;
+    while (added) {
+      added = false;
+      for (const bucket of buckets) {
+        const item = bucket.shift();
+        if (item) {
+          mixed.push(item);
+          added = true;
+        }
+      }
+    }
+
+    set({ error: null });
+    playbackEngine.setQueue(mixed, 0);
+    await playbackEngine.play(mixed[0]);
   },
 
   removeFromQueue: (index: number) => {

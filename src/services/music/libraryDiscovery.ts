@@ -11,7 +11,9 @@ export const librarySuggestions: SearchSuggestionProvider = {
     if (!key) return [];
     const matches = new Set<string>();
     for (const track of library) {
-      for (const value of [track.title, track.artist, track.album.title]) {
+      if (!track) continue;
+      for (const value of [track.title, track.artist, track.album?.title]) {
+        if (typeof value !== 'string' || !value) continue;
         const normalized = value.normalize('NFKC').toLocaleLowerCase();
         if (normalized !== key && normalized.includes(key)) matches.add(value);
         if (matches.size >= 6) return [...matches];

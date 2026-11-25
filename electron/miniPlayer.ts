@@ -1,15 +1,26 @@
 import { BrowserWindow, screen } from 'electron';
 import { join } from 'path';
 
+export interface MiniPlayerLyricWord {
+  text: string;
+  startTime: number;
+  endTime: number;
+}
+
 export interface MiniPlayerStatePayload {
   title: string;
   artist: string;
   cover?: string;
   isPlaying: boolean;
   lyricLine?: string;
+  lyricWords?: MiniPlayerLyricWord[];
+  lyricLineIndex?: number;
+  lyricWordIndex?: number;
+  lyricLineProgress?: number;
+  currentTime?: number;
 }
 
-export type MiniPlayerAction = 'play-pause' | 'next' | 'previous';
+export type MiniPlayerAction = 'play-pause' | 'next' | 'previous' | 'expand';
 
 let miniPlayerWindow: BrowserWindow | null = null;
 let lastState: MiniPlayerStatePayload | null = null;

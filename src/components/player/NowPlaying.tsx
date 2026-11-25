@@ -3,24 +3,29 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import {
   ArrowLeft,
+  Languages,
   Maximize2,
   Minimize2,
   Music,
   Pause,
   PictureInPicture2,
   Play,
+  RefreshCw,
   Repeat,
   Repeat1,
   Shuffle,
   SkipBack,
   SkipForward,
   Sparkles,
+  Trash2,
   Upload,
 } from 'lucide-react';
 import Slider from '@/components/ui/Slider';
 import { importLrcForTrack, importLrcFromFile } from '@/services/lyrics/importer';
+import { SUPPORTED_LANGUAGES } from '@/services/translation/languageDetector';
 import { usePlayerStore } from '@/stores/playerStore';
 import { useStudioStore } from '@/stores/studioStore';
+import { useTranslationStore } from '@/stores/translationStore';
 import { useUIStore, type VisualizationMode } from '@/stores/uiStore';
 
 function formatTime(seconds: number): string {
@@ -44,7 +49,8 @@ const vizModes: { id: VisualizationMode; label: string }[] = [
 export function NowPlaying() {
   const navigate = useNavigate();
   const containerRef = useRef<HTMLDivElement>(null);
-  const activeLineRef = useRef<HTMLParagraphElement>(null);
+  const lyricsScrollRef = useRef<HTMLDivElement>(null);
+  const activeLineRef = useRef<HTMLDivElement>(null);
 
   const currentTrack = usePlayerStore((s) => s.currentTrack);
   const source = usePlayerStore((s) => s.playbackSource);
@@ -80,16 +86,52 @@ export function NowPlaying() {
   const [isSeeking, setIsSeeking] = useState(false);
   const [seekPreview, setSeekPreview] = useState(0);
   const [showAudioInfo, setShowAudioInfo] = useState(false);
+  const [showTranslateMenu, setShowTranslateMenu] = useState(false);
+  const [userScrolledAway, setUserScrolledAway] = useState(false);
+
+  const translationMode = useTranslationStore((s) => s.mode);
+  const setTranslationMode = useTranslationStore((s) => s.setMode);
+  const sourceLang = useTranslationStore((s) => s.sourceLang);
+  const setSourceLang = useTranslationStore((s) => s.setSourceLang);
+  const translationFontSize = useTranslationStore((s) => s.fontSize);
+  const setTranslationFontSize = useTranslationStore((s) => s.setFontSize);
+  const translationOpacity = useTranslationStore((s) => s.opacity);
+  const setTranslationOpacity = useTranslationStore((s) => s.setOpacity);
+  const noticeAccepted = useTranslationStore((s) => s.noticeAccepted);
+  const acceptNotice = useTranslationStore((s) => s.acceptNotice);
+  const translationLoading = useTranslationStore((s) => s.loading);
+  const translationError = useTranslationStore((s) => s.error);
+  const translations = useTranslationStore((s) => s.translations);
+  const activeProvider = useTranslationStore((s) => s.activeProvider);
+  const translateLyrics = useTranslationStore((s) => s.translateLyrics);
+  const resetTranslationForTrack = useTranslationStore((s) => s.resetForTrack);
+  const clearCurrentTrackCache = useTranslationStore((s) => s.clearCurrentTrackCache);
+
+  useEffect(() => {
+    resetTranslationForTrack();
+  }, [currentTrack?.id, resetTranslationForTrack]);
+
+  useEffect(() => {
+    if (translationMode !== 'original' && currentTrack && lyrics && lyrics.lines.length > 0) {
+      void translateLyrics(currentTrack, lyrics);
+    }
+  }, [translationMode, sourceLang, currentTrack, lyrics, translateLyrics]);
 
   const displayedTime = isSeeking ? seekPreview : currentTime;
   const effectiveDuration = duration > 0 ? duration : currentTrack?.duration ?? 0;
 
   useEffect(() => {
-    activeLineRef.current?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'center',
-    });
-  }, [currentLyricLine]);
+    if (showTranslateMenu || userScrolledAway) return;
+    const container = lyricsScrollRef.current;
+    const lineEl = activeLineRef.current;
+    if (!container || !lineEl) return;
+
+    const targetTop = Math.max(
+      0,
+      lineEl.offsetTop - container.clientHeight / 2 + lineEl.clientHeight / 2
+    );
+    container.scrollTo({ top: targetTop, behavior: 'smooth' });
+  }, [currentLyricLine, showTranslateMenu, userScrolledAway]);
 
   const handleFullscreenToggle = async () => {
     const nextImmersive = !immersiveMode;
@@ -427,6 +469,25 @@ export function NowPlaying() {
               )}
               <button
                 type="button"
+                data-testid="lyrics-translate-btn"
+                onClick={() => setShowTranslateMenu((v) => !v)}
+                title="Translate lyrics to English"
+                aria-label="Translate lyrics"
+                className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] transition-colors cursor-pointer ${
+                  translationMode !== 'original'
+                    ? 'bg-white/20 text-white'
+                    : 'bg-white/[0.06] hover:bg-white/12 text-white/70 hover:text-white'
+                }`}
+              >
+                <Languages className="w-3 h-3" />
+                {translationMode === 'original'
+                  ? 'Translate'
+                  : translationMode === 'bilingual'
+                    ? 'EN+'
+                    : 'EN'}
+              </button>
+              <button
+                type="button"
                 onClick={() => void handleImportLrc()}
                 title="Import .lrc file"
                 className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/[0.06] hover:bg-white/12 text-[11px] text-white/70 hover:text-white transition-colors cursor-pointer"
@@ -475,30 +536,212 @@ export function NowPlaying() {
             </div>
           )}
 
+          {showTranslateMenu && (
+            <div
+              data-testid="lyrics-translate-menu"
+              className="mb-3 p-3 rounded-xl bg-white/[0.06] border border-white/10 space-y-2.5 text-xs"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-white/70 font-medium">Translation Mode</span>
+                <div className="flex items-center gap-1">
+                  {(
+                    [
+                      ['original', 'Original'],
+                      ['bilingual', 'Original + EN'],
+                      ['english', 'English Only'],
+                    ] as const
+                  ).map(([modeKey, label]) => (
+                    <button
+                      key={modeKey}
+                      type="button"
+                      onClick={() => {
+                        if (modeKey !== 'original' && !noticeAccepted) acceptNotice();
+                        setTranslationMode(modeKey);
+                      }}
+                      className={`px-2 py-1 rounded-md text-[11px] transition-colors cursor-pointer ${
+                        translationMode === modeKey
+                          ? 'bg-white text-[#0a0a0a] font-medium'
+                          : 'bg-white/[0.06] text-white/70 hover:text-white'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between gap-2">
+                <label className="text-white/60">Source Language</label>
+                <select
+                  value={sourceLang}
+                  onChange={(e) => setSourceLang(e.target.value)}
+                  className="bg-[#141418] border border-white/15 rounded-md px-2 py-1 text-[11px] text-white"
+                >
+                  {SUPPORTED_LANGUAGES.map((lang) => (
+                    <option key={lang.code} value={lang.code}>
+                      {lang.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-white/60">Size:</span>
+                  {(['sm', 'md', 'lg'] as const).map((sz) => (
+                    <button
+                      key={sz}
+                      type="button"
+                      onClick={() => setTranslationFontSize(sz)}
+                      className={`px-1.5 py-0.5 rounded text-[10px] uppercase cursor-pointer ${
+                        translationFontSize === sz
+                          ? 'bg-white/25 text-white'
+                          : 'bg-white/[0.05] text-white/60'
+                      }`}
+                    >
+                      {sz}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex items-center gap-2 flex-1 max-w-[140px]">
+                  <span className="text-white/60">Opacity</span>
+                  <input
+                    type="range"
+                    min={0.4}
+                    max={1}
+                    step={0.05}
+                    value={translationOpacity}
+                    onChange={(e) => setTranslationOpacity(Number(e.target.value))}
+                    className="w-full accent-white cursor-pointer"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-1 border-t border-white/10 text-[10px] text-white/45">
+                <span>
+                  Machine translation via {activeProvider || 'MyMemory'} · Cached locally
+                </span>
+                <div className="flex items-center gap-2">
+                  {currentTrack && lyrics && (
+                    <button
+                      type="button"
+                      onClick={() => void translateLyrics(currentTrack, lyrics, true)}
+                      className="inline-flex items-center gap-1 text-white/65 hover:text-white cursor-pointer"
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                      Retry
+                    </button>
+                  )}
+                  {currentTrack && (
+                    <button
+                      type="button"
+                      onClick={() => void clearCurrentTrackCache(currentTrack.id)}
+                      className="inline-flex items-center gap-1 text-white/65 hover:text-white cursor-pointer"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {translationMode !== 'original' && translationLoading && (
+            <div className="mb-2 text-[11px] text-white/55">
+              Translating lyrics to English...
+            </div>
+          )}
+          {translationMode !== 'original' && translationError && (
+            <div className="mb-2 text-[11px] text-amber-300/90 flex items-center justify-between">
+              <span>{translationError}</span>
+              {currentTrack && lyrics && (
+                <button
+                  type="button"
+                  onClick={() => void translateLyrics(currentTrack, lyrics, true)}
+                  className="underline ml-2 cursor-pointer"
+                >
+                  Retry
+                </button>
+              )}
+            </div>
+          )}
+
+          {userScrolledAway && currentLyricLine >= 0 && (
+            <div className="mb-2 flex justify-end">
+              <button
+                type="button"
+                data-testid="return-to-lyrics-btn"
+                onClick={() => {
+                  setUserScrolledAway(false);
+                  const container = lyricsScrollRef.current;
+                  const lineEl = activeLineRef.current;
+                  if (container && lineEl) {
+                    const targetTop = Math.max(
+                      0,
+                      lineEl.offsetTop - container.clientHeight / 2 + lineEl.clientHeight / 2
+                    );
+                    container.scrollTo({ top: targetTop, behavior: 'smooth' });
+                  }
+                }}
+                className="px-2.5 py-1 rounded-full bg-white/15 hover:bg-white/25 text-[11px] text-white transition-colors cursor-pointer"
+              >
+                Return to current lyrics
+              </button>
+            </div>
+          )}
+
           {lyricsLoading ? (
             <div className="flex-1 flex items-center justify-center text-xs text-white/40">
               Loading synchronized lyrics...
             </div>
           ) : lyrics && lyrics.lines.length > 0 ? (
-            <div className="space-y-3 py-4" style={{ fontFamily }}>
+            <div
+              ref={lyricsScrollRef}
+              onWheel={() => setUserScrolledAway(true)}
+              onTouchStart={() => setUserScrolledAway(true)}
+              className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-3 py-4"
+              style={{ fontFamily }}
+            >
               {lyrics.lines.map((line, idx) => {
                 const isActive = idx === currentLyricLine;
                 const isPast = idx < currentLyricLine;
+                const translatedText = translations[idx];
+                const subSizeClass =
+                  translationFontSize === 'sm'
+                    ? 'text-xs'
+                    : translationFontSize === 'lg'
+                      ? 'text-base'
+                      : 'text-sm';
+
                 return (
-                  <p
+                  <div
                     key={`${line.time}-${idx}`}
                     ref={isActive ? activeLineRef : undefined}
                     onClick={() => seek(line.time)}
-                    className={`text-base leading-relaxed transition-all duration-300 cursor-pointer ${
+                    className={`leading-relaxed transition-all duration-300 cursor-pointer ${
                       isActive
                         ? 'text-white font-semibold scale-[1.02] origin-left'
                         : isPast
-                        ? 'text-white/30 hover:text-white/60'
-                        : 'text-white/50 hover:text-white/80'
+                          ? 'text-white/30 hover:text-white/60'
+                          : 'text-white/50 hover:text-white/80'
                     }`}
                   >
-                    {line.text || '···'}
-                  </p>
+                    {translationMode !== 'english' && (
+                      <p className="text-base">{line.text || '···'}</p>
+                    )}
+                    {translationMode === 'bilingual' && translatedText && (
+                      <p
+                        className={`${subSizeClass} font-normal mt-0.5`}
+                        style={{ opacity: isActive ? Math.min(1, translationOpacity + 0.15) : translationOpacity }}
+                      >
+                        {translatedText}
+                      </p>
+                    )}
+                    {translationMode === 'english' && (
+                      <p className="text-base">{translatedText || line.text || '···'}</p>
+                    )}
+                  </div>
                 );
               })}
             </div>

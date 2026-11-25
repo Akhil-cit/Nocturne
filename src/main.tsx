@@ -6,6 +6,11 @@ import { OverlayApp } from './components/windows/OverlayApp';
 import '@/styles/globals.css';
 
 const params = new URLSearchParams(window.location.search);
+
+// Wire listening history integration (only in main app window, not overlay/mini)
+if (!params.get('overlay') && !params.get('mini')) {
+  void import('@/services/history/listeningSessionIntegration');
+}
 const isOverlay = params.get('overlay') === '1';
 const isMini = params.get('mini') === '1';
 

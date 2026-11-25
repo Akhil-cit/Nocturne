@@ -20,3 +20,22 @@
 - **18:04** — **T10.1–T10.4 [VERIFIED]:** Reproduced 30s iTunes preview substitution on `"Unakke Nizhalaanen"` (`repro_unakke_log.json`). Separated `full` vs `preview`/`metadata` availability (`types.ts`, `itunesProvider.ts`, `tracksProvider.ts`), blocked silent 30s preview substitution in `PlaybackEngine`, added `"Full tracks only"` filter (enabled by default) in `SearchPage.tsx` & `providerStore.ts`, and added clickable Audio Info popover in `NowPlaying.tsx`. Rebuilt `Nocturne.exe` & `Nocturne Setup 0.1.0.exe`; verified `tests/providers.spec.mjs` (9/9 PASS) and `tests/playback.spec.mjs` (10/10 PASS).
 - Phase 11 recovery: no unfinished Phase 10 task entry, stale Phase 2 handoff, clean Monochrome, no Git repository in Nocturne. Typecheck and initial integrated Vite build passed. Reference inventory and source audit completed. Baseline Electron found the three target Apple records with 0 seconds played.
 - **21:34** — **T12.1 & T12.2 [VERIFIED]:** Restored `TracksProvider` (`availability: 'full'`, registered resolver) and added `JioSaavnProvider` (`src/services/music/jiosaavnProvider.ts`, `des.js`, 5-min search cache, in-flight deduplication, 429 `Retry-After` cooldown). `npx tsc --noEmit` (0 errors), `npx vite build` (exit 0), `node tests/jiosaavn_regression.spec.mjs` **7/7 PASS** (`What Makes You Beautiful` 199s, `Rathamaarey` 252s, `Verappa` 100s, `Sweater Weather` 240s, `Rathinamo (Female Version)` 177s, `Unakke Nizhalaanen` 159s, `Killin' 'em (From "Scene")` 94s).
+
+## [2026-11-25T22:42:00+05:30] Phase 13 — Universal Playlist & Music Library Import
+- Implemented modular playlist import architecture under `src/services/playlist/`:
+  - `platformDetector.ts` (Spotify, Apple Music, YouTube Music, YouTube, JioSaavn URL detection)
+  - `httpClient.ts` (Main-process CORS-free `import:fetchUrl` IPC with HTTP 429 `Retry-After` & host cooldowns)
+  - Adapters: `spotifyAdapter.ts` (embed + Pathfinder pagination), `appleMusicAdapter.ts` (JSON-LD MusicPlaylist), `youtubeMusicAdapter.ts` (`ytInitialData` + InnerTube continuation), `jiosaavnPlaylistAdapter.ts` (`webapi.get`), `localFileAdapter.ts` (M3U/M3U8/CSV/JSON/TXT)
+  - `trackResolver.ts` (ISRC, title, artist, album, duration, version-guard matching with resolution cache; preserves unavailable placeholders)
+  - `importManager.ts` (concurrency=2, pacing, duplicate detection, AbortController cancellation, checkpoint persistence)
+- Added `src/stores/importStore.ts`, `src/components/playlist/ImportDialog.tsx`, and integrated into `HomePage.tsx` & `App.tsx`.
+- Verified `tsc --noEmit` (0 errors), `vite build` (exit 0), and `tests/playlist_import.spec.mjs` (7/7 PASS).
+
+## [2026-11-25T23:13:00+05:30] Phase 14 — Library & Playlist Management Redesign
+- Separated Sidebar navigation into Home, Search, Your Library (`/library`), Now Playing (`/now-playing`), Visualization Studio (`/studio`), and Settings (`/settings`).
+- Created `LibraryPage.tsx` with Grid/List views, filter pills, library search, and sorting.
+- Created `PlaylistDetailPage.tsx` (`/playlist/:id`, supporting custom playlists, `liked`, `local`, and `recent`) with Play All, Shuffle Play, Smart Mix, Add to Queue, playlist editing/duplication/merging/export/delete, and multi-select.
+- Created `VirtualizedTrackTable.tsx` (fixed 56px rows, lazy artwork, compact source/availability badges, drag-and-drop reorder, context menus) — renders ~25 DOM rows for 866+ tracks.
+- Created `QueueDrawer.tsx` separating Now Playing from Up Next with drag-and-drop queue reordering.
+- Cleaned up `HomePage.tsx` to remove large inline track tables and link playlist cards to `/playlist/:id`.
+- Verified `tsc --noEmit` (0 errors), `vite build` (exit 0), and `tests/library_redesign.spec.mjs` (7/7 PASS).

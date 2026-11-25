@@ -1,7 +1,10 @@
 import type {
   DisplayInfo,
   ElectronAPI,
+  FetchUrlOptions,
+  FetchUrlResult,
   LrcDialogResult,
+  PlaylistFileDialogResult,
 } from '../../electron/preload';
 import type {
   MiniPlayerAction,
@@ -15,7 +18,10 @@ import type {
 export type {
   DisplayInfo,
   ElectronAPI,
+  FetchUrlOptions,
+  FetchUrlResult,
   LrcDialogResult,
+  PlaylistFileDialogResult,
   MiniPlayerAction,
   MiniPlayerStatePayload,
   OverlayAudioFramePayload,

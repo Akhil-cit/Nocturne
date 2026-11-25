@@ -287,6 +287,16 @@ ipcMain.on('mini:sendState', (_event, state: MiniPlayerStatePayload) => {
 });
 
 ipcMain.on('mini:action', (_event, action: MiniPlayerAction) => {
+  if (action === 'expand') {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+      mainWindow.webContents.send('mini:action', 'expand');
+    }
+    destroyMiniPlayerWindow();
+    return;
+  }
   mainWindow?.webContents.send('mini:action', action);
 });
 
@@ -435,6 +445,82 @@ ipcMain.handle('dialog:openLrcFile', async () => {
     return null;
   }
 });
+
+ipcMain.handle('dialog:openPlaylistFile', async () => {
+  const result = await dialog.showOpenDialog({
+    title: 'Import Playlist File',
+    properties: ['openFile'],
+    filters: [
+      {
+        name: 'Playlist Files',
+        extensions: ['m3u', 'm3u8', 'csv', 'json', 'txt'],
+      },
+      { name: 'All Files', extensions: ['*'] },
+    ],
+  });
+  if (result.canceled || result.filePaths.length === 0) {
+    return null;
+  }
+  const filePath = result.filePaths[0];
+  const fileStat = await stat(filePath);
+  if (fileStat.size > 5 * 1024 * 1024) {
+    throw new Error('Playlist file exceeds 5 MB limit.');
+  }
+  const content = await readFile(filePath, 'utf-8');
+  const ext = extname(filePath).toLowerCase().replace(/^\./, '');
+  const name = basename(filePath, extname(filePath));
+  return { filePath, name, ext, content };
+});
+
+ipcMain.handle(
+  'import:fetchUrl',
+  async (
+    _event,
+    options: {
+      url: string;
+      method?: 'GET' | 'POST';
+      headers?: Record<string, string>;
+      body?: string;
+      timeoutMs?: number;
+    }
+  ) => {
+    if (!options || typeof options.url !== 'string') {
+      throw new Error('Invalid fetch options');
+    }
+    const parsed = new URL(options.url);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      throw new Error('Only HTTP/HTTPS URLs are supported');
+    }
+    const timeoutMs = Math.min(Math.max(options.timeoutMs ?? 15000, 1000), 30000);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(parsed.href, {
+        method: options.method === 'POST' ? 'POST' : 'GET',
+        headers: options.headers,
+        body: options.method === 'POST' ? options.body : undefined,
+        signal: controller.signal,
+      });
+      const text = await response.text();
+      if (text.length > 8 * 1024 * 1024) {
+        throw new Error('Response exceeded 8 MB limit');
+      }
+      const headers: Record<string, string> = {};
+      response.headers.forEach((value, key) => {
+        headers[key.toLowerCase()] = value;
+      });
+      return {
+        ok: response.ok,
+        status: response.status,
+        statusText: response.statusText,
+        headers,
+        text,
+      };
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+);
 
 ipcMain.handle('storage:get', (_event, key: string) => {
   const store = readStorageStore();

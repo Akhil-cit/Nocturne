@@ -1,6 +1,6 @@
 import { musicProviderManager } from '../music/provider';
 import { useProviderStore } from '../../stores/providerStore';
-import type { RepeatMode, Track, TrackAlternateSource, ResolvedStream } from '../music/types';
+import type { AudioQualityPreference, RepeatMode, Track, TrackAlternateSource, ResolvedStream } from '../music/types';
 
 export type PlaybackStatus =
   | 'idle'
@@ -218,38 +218,66 @@ export class PlaybackEngine extends EventTarget {
       if (failedProvider) candidates.sort((a, b) => Number(a.provider === failedProvider) - Number(b.provider === failedProvider));
       for (const candidate of candidates) {
         if (seq !== this.loadSequence || this.userPaused) return;
-        this.mediaRejected = '';
-        let timer: ReturnType<typeof setTimeout> | undefined;
-        try {
-          const source = await musicProviderManager.resolveSource(candidate, track, preferredQuality, this.failedUrls);
+        const qualityOrder: AudioQualityPreference[] = [
+          preferredQuality,
+          ...(['high', 'medium', 'low'] as AudioQualityPreference[]).filter(
+            (q) => q !== preferredQuality
+          ),
+        ];
+        // Only try alternate qualities if the first attempt fails with a media/format error
+        for (let qIdx = 0; qIdx < qualityOrder.length; qIdx++) {
           if (seq !== this.loadSequence || this.userPaused) return;
-          this.selectedSource = source;
+          const qualityAttempt = qualityOrder[qIdx];
           this.mediaRejected = '';
-          this.audio.src = source.url;
-          this.audio.load();
-          this.ensureAudioGraph();
-          await Promise.race([
-            this.audio.play(),
-            new Promise<never>((_, reject) => {
-              timer = setTimeout(() => reject(new Error('Timed out waiting for audio.')), 20000);
-            }),
-          ]);
-          if (seq !== this.loadSequence || this.userPaused) return;
-          if (this.mediaRejected) throw new Error(this.mediaRejected);
-          musicProviderManager.reportPlayback(source.provider);
-          this.emit('sourcechange', { source: { ...source, duration: this.audio.duration } });
-          return;
-        } catch (err) {
-          if (seq !== this.loadSequence || this.userPaused) return;
-          if (this.selectedSource?.trackId === candidate.trackId) this.failedUrls.add(this.selectedSource.url);
-          failure = candidate.provider + ': ' + (this.mediaRejected || this.audio.error?.message || (err instanceof Error ? err.message : 'Unable to load audio.'));
-          musicProviderManager.reportPlayback(candidate.provider, failure);
-          this.audio.pause();
-          this.audio.removeAttribute('src');
-          this.audio.load();
-        } finally {
-          clearTimeout(timer);
+          let timer: ReturnType<typeof setTimeout> | undefined;
+          try {
+            const source = await musicProviderManager.resolveSource(
+              candidate,
+              track,
+              qualityAttempt,
+              this.failedUrls
+            );
+            if (seq !== this.loadSequence || this.userPaused) return;
+            this.selectedSource = source;
+            this.mediaRejected = '';
+            this.audio.src = source.url;
+            this.audio.load();
+            this.ensureAudioGraph();
+            await Promise.race([
+              this.audio.play(),
+              new Promise<never>((_, reject) => {
+                timer = setTimeout(() => reject(new Error('Timed out waiting for audio.')), 20000);
+              }),
+            ]);
+            if (seq !== this.loadSequence || this.userPaused) return;
+            if (this.mediaRejected) throw new Error(this.mediaRejected);
+            musicProviderManager.reportPlayback(source.provider);
+            this.emit('sourcechange', { source: { ...source, duration: this.audio.duration } });
+            return;
+          } catch (err) {
+            if (seq !== this.loadSequence || this.userPaused) return;
+            if (this.selectedSource?.trackId === candidate.trackId) {
+              this.failedUrls.add(this.selectedSource.url);
+            }
+            const errMsg =
+              this.mediaRejected ||
+              this.audio.error?.message ||
+              (err instanceof Error ? err.message : 'Unable to load audio.');
+            failure = candidate.provider + ': ' + errMsg;
+            this.audio.pause();
+            this.audio.removeAttribute('src');
+            this.audio.load();
+            const isFormatOrMediaError =
+              /format error|not supported|MEDIA_ELEMENT_ERROR|decode/i.test(errMsg) ||
+              Boolean(this.mediaRejected);
+            if (!isFormatOrMediaError) {
+              break;
+            }
+          } finally {
+            clearTimeout(timer);
+          }
         }
+        musicProviderManager.reportPlayback(candidate.provider, failure);
       }
       if (seq !== this.loadSequence || this.userPaused) return;
       if (!candidates.length) {
@@ -613,6 +641,51 @@ export class PlaybackEngine extends EventTarget {
       queue: this.getQueue(),
       index: this.queueIndex,
     });
+  }
+
+  public insertNextInQueue(trackOrTracks: Track | Track[]): void {
+    const items = Array.isArray(trackOrTracks) ? trackOrTracks : [trackOrTracks];
+    if (items.length === 0) return;
+
+    const insertAt = this.queueIndex >= 0 ? this.queueIndex + 1 : 0;
+    this.queue.splice(insertAt, 0, ...items);
+    this.originalQueue.splice(insertAt, 0, ...items);
+
+    if (this.queueIndex === -1) {
+      this.queueIndex = 0;
+    }
+
+    this.emit('queuechange', {
+      queue: this.getQueue(),
+      index: this.queueIndex,
+    });
+  }
+
+  public reorderQueue(fromIndex: number, toIndex: number): void {
+    if (
+      fromIndex === toIndex ||
+      fromIndex < 0 ||
+      fromIndex >= this.queue.length ||
+      toIndex < 0 ||
+      toIndex >= this.queue.length
+    ) {
+      return;
+    }
+    const currentTrack = this.getCurrentTrack();
+    const [moved] = this.queue.splice(fromIndex, 1);
+    this.queue.splice(toIndex, 0, moved);
+    if (currentTrack) {
+      this.queueIndex = this.queue.findIndex((t) => t.id === currentTrack.id);
+    }
+    this.emit('queuechange', {
+      queue: this.getQueue(),
+      index: this.queueIndex,
+    });
+  }
+
+  public async playQueueIndex(index: number): Promise<void> {
+    if (index < 0 || index >= this.queue.length) return;
+    await this.loadAndPlayIndex(index);
   }
 
   public clearQueue(): void {

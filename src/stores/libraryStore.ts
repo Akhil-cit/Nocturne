@@ -8,6 +8,12 @@ export interface Playlist {
   name: string;
   tracks: Track[];
   createdAt: number;
+  description?: string;
+  cover?: string;
+  sourcePlatform?: string;
+  sourceUrl?: string;
+  updatedAt?: number;
+  lastPlayedAt?: number;
 }
 
 export interface LibraryPreferences {
@@ -36,10 +42,26 @@ export interface LibraryState {
   toggleFavorite: (track: Track) => void;
   isFavorite: (trackId: string) => boolean;
   recordPlay: (track: Track) => void;
-  createPlaylist: (name: string, tracks?: Track[]) => Playlist;
+  createPlaylist: (
+    name: string,
+    tracks?: Track[],
+    meta?: { description?: string; cover?: string; sourcePlatform?: string; sourceUrl?: string }
+  ) => Playlist;
   deletePlaylist: (id: string) => void;
+  renamePlaylist: (id: string, name: string) => void;
+  updatePlaylistDetails: (
+    id: string,
+    patch: { name?: string; description?: string; cover?: string }
+  ) => void;
+  duplicatePlaylist: (id: string) => Playlist | null;
+  mergePlaylists: (sourceId: string, targetId: string) => void;
+  reorderPlaylistTracks: (id: string, fromIndex: number, toIndex: number) => void;
+  removeMultipleFromPlaylist: (id: string, trackIds: ReadonlySet<string>) => void;
+  markPlaylistPlayed: (id: string) => void;
   addToPlaylist: (id: string, track: Track) => void;
+  addTracksToPlaylist: (id: string, tracks: Track[]) => void;
   removeFromPlaylist: (id: string, trackId: string) => void;
+  replaceTrackInPlaylist: (id: string, oldTrackId: string, newTrack: Track) => void;
   hydrate: () => Promise<void>;
 }
 
@@ -159,13 +181,23 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     });
   },
 
-  createPlaylist: (name: string, tracks: Track[] = []) => {
+  createPlaylist: (
+    name: string,
+    tracks: Track[] = [],
+    meta?: { description?: string; cover?: string; sourcePlatform?: string; sourceUrl?: string }
+  ) => {
     const cleanName = name.trim() || 'Untitled Playlist';
+    const firstCover = tracks.find((t) => t.cover)?.cover;
     const playlist: Playlist = {
       id: generatePlaylistId(),
       name: cleanName,
       tracks: [...tracks],
       createdAt: Date.now(),
+      updatedAt: Date.now(),
+      description: meta?.description,
+      cover: meta?.cover || firstCover,
+      sourcePlatform: meta?.sourcePlatform,
+      sourceUrl: meta?.sourceUrl,
     };
     set((state) => {
       const playlists = [playlist, ...state.playlists];
@@ -185,12 +217,136 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     });
   },
 
+  renamePlaylist: (id: string, name: string) => {
+    const clean = name.trim();
+    if (!clean) return;
+    set((state) => {
+      const playlists = state.playlists.map((pl) =>
+        pl.id === id ? { ...pl, name: clean, updatedAt: Date.now() } : pl
+      );
+      const next = { ...state, playlists };
+      persistState(next);
+      return { playlists };
+    });
+  },
+
+  updatePlaylistDetails: (
+    id: string,
+    patch: { name?: string; description?: string; cover?: string }
+  ) => {
+    set((state) => {
+      const playlists = state.playlists.map((pl) => {
+        if (pl.id !== id) return pl;
+        return {
+          ...pl,
+          name: patch.name !== undefined ? patch.name.trim() || pl.name : pl.name,
+          description: patch.description !== undefined ? patch.description : pl.description,
+          cover: patch.cover !== undefined ? patch.cover : pl.cover,
+          updatedAt: Date.now(),
+        };
+      });
+      const next = { ...state, playlists };
+      persistState(next);
+      return { playlists };
+    });
+  },
+
+  duplicatePlaylist: (id: string) => {
+    const source = get().playlists.find((p) => p.id === id);
+    if (!source) return null;
+    return get().createPlaylist(`${source.name} (Copy)`, source.tracks, {
+      description: source.description,
+      cover: source.cover,
+      sourcePlatform: source.sourcePlatform,
+      sourceUrl: source.sourceUrl,
+    });
+  },
+
+  mergePlaylists: (sourceId: string, targetId: string) => {
+    if (sourceId === targetId) return;
+    const source = get().playlists.find((p) => p.id === sourceId);
+    if (!source) return;
+    get().addTracksToPlaylist(targetId, source.tracks);
+  },
+
+  reorderPlaylistTracks: (id: string, fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex) return;
+    set((state) => {
+      const playlists = state.playlists.map((pl) => {
+        if (pl.id !== id) return pl;
+        if (
+          fromIndex < 0 ||
+          fromIndex >= pl.tracks.length ||
+          toIndex < 0 ||
+          toIndex >= pl.tracks.length
+        ) {
+          return pl;
+        }
+        const nextTracks = [...pl.tracks];
+        const [moved] = nextTracks.splice(fromIndex, 1);
+        nextTracks.splice(toIndex, 0, moved);
+        return { ...pl, tracks: nextTracks, updatedAt: Date.now() };
+      });
+      const next = { ...state, playlists };
+      persistState(next);
+      return { playlists };
+    });
+  },
+
+  removeMultipleFromPlaylist: (id: string, trackIds: ReadonlySet<string>) => {
+    if (trackIds.size === 0) return;
+    set((state) => {
+      const playlists = state.playlists.map((pl) => {
+        if (pl.id !== id) return pl;
+        return {
+          ...pl,
+          tracks: pl.tracks.filter((t) => !trackIds.has(t.id)),
+          updatedAt: Date.now(),
+        };
+      });
+      const next = { ...state, playlists };
+      persistState(next);
+      return { playlists };
+    });
+  },
+
+  markPlaylistPlayed: (id: string) => {
+    set((state) => {
+      const playlists = state.playlists.map((pl) =>
+        pl.id === id ? { ...pl, lastPlayedAt: Date.now() } : pl
+      );
+      const next = { ...state, playlists };
+      persistState(next);
+      return { playlists };
+    });
+  },
+
   addToPlaylist: (id: string, track: Track) => {
     set((state) => {
       const playlists = state.playlists.map((pl) => {
         if (pl.id !== id) return pl;
         if (pl.tracks.some((t) => t.id === track.id)) return pl;
         return { ...pl, tracks: [...pl.tracks, track] };
+      });
+      const next = { ...state, playlists };
+      persistState(next);
+      return { playlists };
+    });
+  },
+
+  addTracksToPlaylist: (id: string, tracks: Track[]) => {
+    if (tracks.length === 0) return;
+    set((state) => {
+      const playlists = state.playlists.map((pl) => {
+        if (pl.id !== id) return pl;
+        const existingIds = new Set(pl.tracks.map((t) => t.id));
+        const toAdd = tracks.filter((t) => {
+          if (existingIds.has(t.id)) return false;
+          existingIds.add(t.id);
+          return true;
+        });
+        if (toAdd.length === 0) return pl;
+        return { ...pl, tracks: [...pl.tracks, ...toAdd] };
       });
       const next = { ...state, playlists };
       persistState(next);
@@ -205,6 +361,21 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
         return {
           ...pl,
           tracks: pl.tracks.filter((t) => t.id !== trackId),
+        };
+      });
+      const next = { ...state, playlists };
+      persistState(next);
+      return { playlists };
+    });
+  },
+
+  replaceTrackInPlaylist: (id: string, oldTrackId: string, newTrack: Track) => {
+    set((state) => {
+      const playlists = state.playlists.map((pl) => {
+        if (pl.id !== id) return pl;
+        return {
+          ...pl,
+          tracks: pl.tracks.map((t) => (t.id === oldTrackId ? newTrack : t)),
         };
       });
       const next = { ...state, playlists };

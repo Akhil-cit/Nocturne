@@ -17,7 +17,9 @@
     "electron:dev": "vite build && electron .",
     "test:playback": "node tests/playback.spec.mjs",
     "test:providers": "node tests/providers.spec.mjs",
-    "test:regression": "node tests/jiosaavn_regression.spec.mjs"
+    "test:regression": "node tests/jiosaavn_regression.spec.mjs",
+    "test:import": "node tests/playlist_import.spec.mjs",
+    "test:library": "node tests/library_redesign.spec.mjs"
   },
   "dependencies": {
     "color-thief-browser": "^2.0.2",

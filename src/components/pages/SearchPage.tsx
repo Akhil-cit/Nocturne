@@ -164,18 +164,15 @@ export function SearchPage() {
         <div className="relative">
           <Search className="w-5 h-5 text-white/40 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
-            list="library-suggestions"
             ref={inputRef}
             type="text"
+            autoComplete="off"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search tracks, artists, or albums..."
             aria-label="Search music"
             className="w-full h-13 pl-12 pr-11 rounded-2xl bg-white/[0.05] backdrop-blur-xl border border-white/10 text-base text-white placeholder:text-white/35 focus:outline-none focus:border-white/25 focus:bg-white/[0.07] transition-all"
           />
-          <datalist id="library-suggestions">
-            {suggestions.map((value) => <option key={value} value={value} />)}
-          </datalist>
           {searchQuery && (
             <button
               type="button"

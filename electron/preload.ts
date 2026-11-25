@@ -13,6 +13,29 @@ export interface LrcDialogResult {
   content: string;
 }
 
+export interface PlaylistFileDialogResult {
+  filePath: string;
+  name: string;
+  ext: string;
+  content: string;
+}
+
+export interface FetchUrlOptions {
+  url: string;
+  method?: 'GET' | 'POST';
+  headers?: Record<string, string>;
+  body?: string;
+  timeoutMs?: number;
+}
+
+export interface FetchUrlResult {
+  ok: boolean;
+  status: number;
+  statusText: string;
+  headers: Record<string, string>;
+  text: string;
+}
+
 export interface DisplayInfo {
   id: number;
   index: number;
@@ -39,6 +62,10 @@ const electronAPI = {
     ipcRenderer.invoke('music:officialSearch', service, query) as Promise<boolean>,
   importLocalPlaylist: () =>
     ipcRenderer.invoke('dialog:importPlaylist') as Promise<{ name: string; paths: string[]; skipped: number } | null>,
+  openPlaylistFile: () =>
+    ipcRenderer.invoke('dialog:openPlaylistFile') as Promise<PlaylistFileDialogResult | null>,
+  fetchUrl: (options: FetchUrlOptions) =>
+    ipcRenderer.invoke('import:fetchUrl', options) as Promise<FetchUrlResult>,
   readLyricsSidecar: (audioPath: string) =>
     ipcRenderer.invoke('lyrics:readSidecar', audioPath) as Promise<string | null>,
   openLrcFile: () =>

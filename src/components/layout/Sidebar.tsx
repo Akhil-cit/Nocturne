@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import {
+  Disc3,
   Home,
   Library,
   Maximize2,
@@ -13,7 +14,8 @@ import { useUIStore } from '@/stores/uiStore';
 const navItems = [
   { to: '/', label: 'Home', icon: Home, end: true },
   { to: '/search', label: 'Search', icon: Search, end: false },
-  { to: '/now-playing', label: 'Library', icon: Library, end: false },
+  { to: '/library', label: 'Your Library', icon: Library, end: false },
+  { to: '/now-playing', label: 'Now Playing', icon: Disc3, end: false },
   { to: '/studio', label: 'Visualization Studio', icon: SlidersHorizontal, end: false },
   { to: '/settings', label: 'Settings', icon: Settings, end: false },
 ];
