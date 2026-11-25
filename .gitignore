@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+
+# Build & packaging outputs
+dist/
+dist-electron/
+release/
+*.exe
+*.blockmap
+*.AppImage
+*.dmg
+
+# Logs & caches
+*.log
+npm-debug.log*
+.vite/
+.cache/
+
+# Test outputs & artifacts
+test-artifacts/
+test-results/
+playwright-report/
+
+# Internal AI scratch / worker checkpoints
+docs/checkpoints/
+
+# Environment & local overrides
+.env
+.env.*
+!.env.example
+*.local
+
+# OS & IDE files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

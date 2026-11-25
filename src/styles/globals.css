@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+@theme {
+  --color-obsidian: #0a0a0a;
+  --color-obsidian-elevated: #0e0e0e;
+  --color-obsidian-surface: #141414;
+  --color-glass-border: rgba(255, 255, 255, 0.08);
+  --color-glass-bg: rgba(255, 255, 255, 0.04);
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", "Noto Sans Tamil", "Nirmala UI", "Latha", Roboto, sans-serif;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+    background-color: #0a0a0a;
+    color: #ffffff;
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  html.transparent-window,
+  html.transparent-window body,
+  html.transparent-window #root {
+    background-color: transparent !important;
+  }
+}
+
+.glass-panel {
+  background: rgba(14, 14, 14, 0.72);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.24);
+}

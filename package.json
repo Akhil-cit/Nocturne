@@ -1,0 +1,47 @@
+{
+  "name": "nocturne",
+  "version": "0.1.0",
+  "description": "Immersive desktop music player & visualization engine",
+  "main": "dist-electron/main.js",
+  "author": "Nocturne Contributors",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Akhil-cit/Nocturne.git"
+  },
+  "homepage": "https://github.com/Akhil-cit/Nocturne",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build && electron-builder",
+    "preview": "vite preview",
+    "electron:dev": "vite build && electron .",
+    "test:playback": "node tests/playback.spec.mjs",
+    "test:providers": "node tests/providers.spec.mjs",
+    "test:regression": "node tests/jiosaavn_regression.spec.mjs"
+  },
+  "dependencies": {
+    "color-thief-browser": "^2.0.2",
+    "des.js": "^1.1.0",
+    "lucide-react": "^0.513.0",
+    "motion": "^12.12.1",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-router-dom": "^7.6.1",
+    "zustand": "^5.0.5"
+  },
+  "devDependencies": {
+    "playwright": "^1.52.0",
+    "@tailwindcss/vite": "^4.1.8",
+    "@types/react": "^19.1.6",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^4.6.0",
+    "autoprefixer": "^10.4.21",
+    "electron": "^36.3.0",
+    "electron-builder": "^26.0.12",
+    "tailwindcss": "^4.1.8",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5",
+    "vite-plugin-electron": "^1.2.0",
+    "vite-plugin-electron-renderer": "^0.14.6"
+  }
+}
