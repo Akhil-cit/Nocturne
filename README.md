@@ -6,6 +6,8 @@
 
 **An immersive desktop music player with real-time audio visualizations and synchronized lyrics.**
 
+[![Download Nocturne](https://img.shields.io/badge/Download-Nocturne%20v0.1.1-black?style=for-the-badge&logo=windows)](https://github.com/Akhil-cit/Nocturne/releases/tag/v0.1.1)
+
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Platform: Windows](https://img.shields.io/badge/Platform-Windows-lightgrey)](https://github.com/Akhil-cit/Nocturne/releases)
 [![Built with Electron](https://img.shields.io/badge/Built%20with-Electron-47848F)](https://www.electronjs.org/)
