@@ -27,6 +27,7 @@ import { usePlayerStore } from '@/stores/playerStore';
 import { useStudioStore } from '@/stores/studioStore';
 import { useTranslationStore } from '@/stores/translationStore';
 import { useUIStore, type VisualizationMode } from '@/stores/uiStore';
+import SpotifyLyrics from '@/components/player/SpotifyLyrics';
 
 function formatTime(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
@@ -44,6 +45,7 @@ const vizModes: { id: VisualizationMode; label: string }[] = [
   { id: 'orbit', label: 'Orbit' },
   { id: 'particle', label: 'Particle' },
   { id: 'wave', label: 'Wave' },
+  { id: 'spotify', label: 'Spotify' },
 ];
 
 export function NowPlaying() {
@@ -81,6 +83,8 @@ export function NowPlaying() {
   const setVisualizationMode = useUIStore((s) => s.setVisualizationMode);
   const immersiveMode = useUIStore((s) => s.immersiveMode);
   const setImmersiveMode = useUIStore((s) => s.setImmersiveMode);
+  const lyricsDisplayMode = useUIStore((s) => s.lyricsDisplayMode);
+  const setLyricsDisplayMode = useUIStore((s) => s.setLyricsDisplayMode);
   const fontFamily = useStudioStore((s) => s.fontFamily);
 
   const [isSeeking, setIsSeeking] = useState(false);
@@ -445,7 +449,109 @@ export function NowPlaying() {
         </motion.div>
 
         {/* Lyrics Display Area */}
-        <div className="w-full max-w-md h-[380px] rounded-2xl bg-white/[0.03] backdrop-blur-xl border border-white/[0.08] p-6 overflow-y-auto flex flex-col">
+        {lyricsDisplayMode === 'spotify' ? (
+          /* Spotify-style immersive lyrics */
+          <div className="w-full max-w-lg h-[420px] rounded-2xl bg-white/[0.03] backdrop-blur-xl border border-white/[0.08] overflow-hidden flex flex-col">
+            {/* Spotify mode header */}
+            <div className="flex items-center justify-between gap-2 px-5 pt-4 pb-2 shrink-0">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium uppercase tracking-widest text-white/40">
+                  Lyrics
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/15 border border-emerald-400/25 text-emerald-200">
+                  Spotify Style
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  data-testid="lyrics-translate-btn"
+                  onClick={() => setShowTranslateMenu((v) => !v)}
+                  title="Translate lyrics to English"
+                  aria-label="Translate lyrics"
+                  className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] transition-colors cursor-pointer ${
+                    translationMode !== 'original'
+                      ? 'bg-white/20 text-white'
+                      : 'bg-white/[0.06] hover:bg-white/12 text-white/70 hover:text-white'
+                  }`}
+                >
+                  <Languages className="w-3 h-3" />
+                  {translationMode === 'original'
+                    ? 'Translate'
+                    : translationMode === 'bilingual'
+                      ? 'EN+'
+                      : 'EN'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLyricsDisplayMode('normal')}
+                  title="Switch to normal lyrics"
+                  className="px-2 py-1 rounded-lg bg-white/[0.06] hover:bg-white/12 text-[11px] text-white/70 hover:text-white transition-colors cursor-pointer"
+                >
+                  Normal
+                </button>
+              </div>
+            </div>
+
+            {/* Translation controls (shared) */}
+            {showTranslateMenu && (
+              <div className="mx-5 mb-2 p-3 rounded-xl bg-white/[0.06] border border-white/10 space-y-2.5 text-xs shrink-0">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-white/70 font-medium">Translation Mode</span>
+                  <div className="flex items-center gap-1">
+                    {(
+                      [
+                        ['original', 'Original'],
+                        ['bilingual', 'Original + EN'],
+                        ['english', 'English Only'],
+                      ] as const
+                    ).map(([modeKey, label]) => (
+                      <button
+                        key={modeKey}
+                        type="button"
+                        onClick={() => {
+                          if (modeKey !== 'original' && !noticeAccepted) acceptNotice();
+                          setTranslationMode(modeKey);
+                        }}
+                        className={`px-2 py-1 rounded-md text-[11px] transition-colors cursor-pointer ${
+                          translationMode === modeKey
+                            ? 'bg-white text-[#0a0a0a] font-medium'
+                            : 'bg-white/[0.06] text-white/70 hover:text-white'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <label className="text-white/60">Source Language</label>
+                  <select
+                    value={sourceLang}
+                    onChange={(e) => setSourceLang(e.target.value)}
+                    className="bg-[#141418] border border-white/15 rounded-md px-2 py-1 text-[11px] text-white"
+                  >
+                    {SUPPORTED_LANGUAGES.map((lang) => (
+                      <option key={lang.code} value={lang.code}>
+                        {lang.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {translationMode !== 'original' && translationLoading && (
+              <div className="mx-5 mb-2 text-[11px] text-white/55 shrink-0">
+                Translating lyrics to English...
+              </div>
+            )}
+
+            <SpotifyLyrics />
+          </div>
+        ) : (
+          /* Normal lyrics panel */
+          <div className="w-full max-w-md h-[380px] rounded-2xl bg-white/[0.03] backdrop-blur-xl border border-white/[0.08] p-6 overflow-y-auto overflow-x-hidden flex flex-col">
           <div className="flex flex-wrap items-center justify-between gap-2 mb-3 shrink-0">
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium uppercase tracking-widest text-white/40">
@@ -494,6 +600,14 @@ export function NowPlaying() {
               >
                 <Upload className="w-3 h-3" />
                 .lrc
+              </button>
+              <button
+                type="button"
+                onClick={() => setLyricsDisplayMode('spotify')}
+                title="Switch to Spotify-style lyrics"
+                className="px-2 py-1 rounded-lg bg-white/[0.06] hover:bg-white/12 text-[11px] text-white/70 hover:text-white transition-colors cursor-pointer"
+              >
+                ♪ Live
               </button>
             </div>
           </div>
@@ -700,8 +814,8 @@ export function NowPlaying() {
               ref={lyricsScrollRef}
               onWheel={() => setUserScrolledAway(true)}
               onTouchStart={() => setUserScrolledAway(true)}
-              className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-3 py-4"
-              style={{ fontFamily }}
+              className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pr-1 space-y-3 py-4"
+              style={{ fontFamily, wordBreak: 'break-word' }}
             >
               {lyrics.lines.map((line, idx) => {
                 const isActive = idx === currentLyricLine;
@@ -753,6 +867,7 @@ export function NowPlaying() {
             </div>
           )}
         </div>
+        )}
       </div>
     </div>
   );

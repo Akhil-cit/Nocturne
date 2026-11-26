@@ -13,6 +13,7 @@ import type {
   AudioQualityPreference,
   FullTrackPlaybackResolver,
   IMusicProvider,
+  OnlinePlaylist,
   ResolvedStream,
   SearchResults,
   Track,
@@ -259,8 +260,110 @@ export class JioSaavnProvider implements IMusicProvider, FullTrackPlaybackResolv
     return normalizeSong(song as RawSaavnSong);
   }
 
-  public async getAlbum(): Promise<Album & { tracks: Track[] }> {
-    throw new Error('JioSaavn album lookup not implemented');
+  public async getAlbum(id: string): Promise<Album & { tracks: Track[] }> {
+    const rawId = id.replace(/^jiosaavn:album:/, '').replace(/^jiosaavn:/, '');
+    const data = await this.saavnFetch<{
+      id?: string;
+      title?: string;
+      name?: string;
+      image?: string;
+      year?: string;
+      list?: RawSaavnSong[];
+      more_info?: { artistMap?: { primary_artists?: Array<{ name?: string }> } };
+    }>({
+      __call: 'content.getAlbumDetails',
+      _format: 'json',
+      _marker: '0',
+      api_version: '4',
+      ctx: 'android',
+      albumid: rawId,
+    });
+    if (!data || (!data.id && !data.title && !data.name)) {
+      throw new Error(`JioSaavn: album ${id} not found`);
+    }
+    const tracks = (data.list ?? []).map(normalizeSong);
+    const cover = (data.image ?? '').replace(/150x150|50x50/, '500x500');
+    const artistName =
+      data.more_info?.artistMap?.primary_artists?.map((a) => a.name).filter(Boolean).join(', ') ||
+      tracks[0]?.artist ||
+      'Unknown Artist';
+    return {
+      id: `jiosaavn:album:${data.id ?? rawId}`,
+      title: data.title ?? data.name ?? 'Unknown Album',
+      cover,
+      artist: artistName,
+      releaseDate: data.year,
+      trackCount: tracks.length,
+      provider: 'jiosaavn',
+      tracks,
+    };
+  }
+
+  public async searchPlaylists(query: string): Promise<OnlinePlaylist[]> {
+    const data = await this.saavnFetch<{
+      results?: Array<{
+        id?: string;
+        title?: string;
+        subtitle?: string;
+        image?: string;
+        more_info?: { song_count?: string; firstname?: string };
+      }>;
+    }>({
+      __call: 'search.getPlaylistResults',
+      _format: 'json',
+      _marker: '0',
+      api_version: '4',
+      ctx: 'android',
+      n: '20',
+      p: '1',
+      q: query,
+    });
+    if (!data?.results) return [];
+    return data.results
+      .filter((p) => p.id && p.title)
+      .map((p) => ({
+        id: `jiosaavn:playlist:${p.id}`,
+        title: p.title!,
+        description: p.subtitle,
+        cover: (p.image ?? '').replace(/150x150|50x50/, '500x500'),
+        creator: p.more_info?.firstname || 'JioSaavn',
+        trackCount: p.more_info?.song_count ? Number(p.more_info.song_count) : undefined,
+        provider: 'jiosaavn',
+      }));
+  }
+
+  public async getPlaylist(id: string): Promise<OnlinePlaylist & { tracks: Track[] }> {
+    const rawId = id.replace(/^jiosaavn:playlist:/, '').replace(/^jiosaavn:/, '');
+    const data = await this.saavnFetch<{
+      id?: string;
+      title?: string;
+      subtitle?: string;
+      header_desc?: string;
+      image?: string;
+      list?: RawSaavnSong[];
+      more_info?: { firstname?: string; song_count?: string };
+    }>({
+      __call: 'playlist.getDetails',
+      _format: 'json',
+      _marker: '0',
+      api_version: '4',
+      ctx: 'android',
+      listid: rawId,
+    });
+    if (!data || (!data.id && !data.title)) {
+      throw new Error(`JioSaavn: playlist ${id} not found`);
+    }
+    const tracks = (data.list ?? []).map(normalizeSong);
+    return {
+      id: `jiosaavn:playlist:${data.id ?? rawId}`,
+      title: data.title ?? 'Playlist',
+      description: data.header_desc || data.subtitle,
+      cover: (data.image ?? '').replace(/150x150|50x50/, '500x500'),
+      creator: data.more_info?.firstname || 'JioSaavn',
+      trackCount: tracks.length,
+      provider: 'jiosaavn',
+      tracks,
+    };
   }
 
   public async getArtist(): Promise<Artist & { topTracks: Track[]; albums: Album[] }> {

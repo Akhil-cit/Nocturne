@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { RepeatMode, Track } from '@/services/music/types';
+import type { Album, Artist, OnlinePlaylist, RepeatMode, Track } from '@/services/music/types';
 import { musicProviderManager } from '@/services/music/provider';
 import { playbackEngine } from '@/services/playback/engine';
 
@@ -36,8 +36,18 @@ export interface LibraryState {
   favorites: Track[];
   recentlyPlayed: Track[];
   playlists: Playlist[];
+  savedArtists: Artist[];
+  savedAlbums: Album[];
+  savedOnlinePlaylists: OnlinePlaylist[];
   preferences: LibraryPreferences;
   hydrated: boolean;
+
+  toggleSaveArtist: (artist: Artist) => void;
+  isArtistSaved: (artistId: string) => boolean;
+  toggleSaveAlbum: (album: Album) => void;
+  isAlbumSaved: (albumId: string) => boolean;
+  toggleSaveOnlinePlaylist: (playlist: OnlinePlaylist) => void;
+  isOnlinePlaylistSaved: (playlistId: string) => boolean;
 
   toggleFavorite: (track: Track) => void;
   isFavorite: (trackId: string) => boolean;
@@ -152,6 +162,45 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
   favorites: [],
   recentlyPlayed: [],
   playlists: [],
+  savedArtists: (() => {
+    try { return JSON.parse(localStorage.getItem('nocturne-saved-artists') || '[]'); } catch { return []; }
+  })(),
+  savedAlbums: (() => {
+    try { return JSON.parse(localStorage.getItem('nocturne-saved-albums') || '[]'); } catch { return []; }
+  })(),
+  savedOnlinePlaylists: (() => {
+    try { return JSON.parse(localStorage.getItem('nocturne-saved-online-playlists') || '[]'); } catch { return []; }
+  })(),
+
+  toggleSaveArtist: (artist) => {
+    set((s) => {
+      const exists = s.savedArtists.some((a) => a.id === artist.id || a.name.toLowerCase() === artist.name.toLowerCase());
+      const next = exists ? s.savedArtists.filter((a) => a.id !== artist.id && a.name.toLowerCase() !== artist.name.toLowerCase()) : [artist, ...s.savedArtists];
+      try { localStorage.setItem('nocturne-saved-artists', JSON.stringify(next)); } catch {}
+      return { savedArtists: next };
+    });
+  },
+  isArtistSaved: (artistId) => get().savedArtists.some((a) => a.id === artistId),
+
+  toggleSaveAlbum: (album) => {
+    set((s) => {
+      const exists = s.savedAlbums.some((a) => a.id === album.id);
+      const next = exists ? s.savedAlbums.filter((a) => a.id !== album.id) : [album, ...s.savedAlbums];
+      try { localStorage.setItem('nocturne-saved-albums', JSON.stringify(next)); } catch {}
+      return { savedAlbums: next };
+    });
+  },
+  isAlbumSaved: (albumId) => get().savedAlbums.some((a) => a.id === albumId),
+
+  toggleSaveOnlinePlaylist: (playlist) => {
+    set((s) => {
+      const exists = s.savedOnlinePlaylists.some((p) => p.id === playlist.id);
+      const next = exists ? s.savedOnlinePlaylists.filter((p) => p.id !== playlist.id) : [playlist, ...s.savedOnlinePlaylists];
+      try { localStorage.setItem('nocturne-saved-online-playlists', JSON.stringify(next)); } catch {}
+      return { savedOnlinePlaylists: next };
+    });
+  },
+  isOnlinePlaylistSaved: (playlistId) => get().savedOnlinePlaylists.some((p) => p.id === playlistId),
   preferences: { ...DEFAULT_PREFERENCES },
   hydrated: false,
 

@@ -6,6 +6,9 @@ import QueueDrawer from '@/components/player/QueueDrawer';
 import HomePage from '@/components/pages/HomePage';
 import LibraryPage from '@/components/pages/LibraryPage';
 import PlaylistDetailPage from '@/components/pages/PlaylistDetailPage';
+import ArtistPage from '@/components/pages/ArtistPage';
+import AlbumPage from '@/components/pages/AlbumPage';
+import OnlinePlaylistPage from '@/components/pages/OnlinePlaylistPage';
 import SearchPage from '@/components/pages/SearchPage';
 import { PageErrorBoundary } from '@/components/ui/PageErrorBoundary';
 import NowPlaying from '@/components/player/NowPlaying';
@@ -36,6 +39,9 @@ export default function App() {
           />
           <Route path="/library" element={<LibraryPage />} />
           <Route path="/playlist/:id" element={<PlaylistDetailPage />} />
+          <Route path="/artist/:id" element={<ArtistPage />} />
+          <Route path="/album/:id" element={<AlbumPage />} />
+          <Route path="/discover/playlist/:id" element={<OnlinePlaylistPage />} />
           <Route path="/now-playing" element={<NowPlaying />} />
           <Route path="/studio" element={<StudioPage />} />
           <Route path="/settings" element={<SettingsPage />} />

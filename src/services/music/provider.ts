@@ -1,11 +1,15 @@
 import type {
   Album,
+  AlbumDetail,
+  Artist,
+  ArtistDetail,
   AudioQualityPreference,
   FullTrackPlaybackResolver,
+  OnlinePlaylist,
   ProviderHealthMonitor,
   ResolvedStream,
+  SearchCategory,
   TrackAlternateSource,
-  Artist,
   IMusicProvider,
   MetadataProvider,
   MusicDiscoveryProvider,
@@ -667,6 +671,92 @@ export class MusicProviderManager implements ProviderHealthMonitor {
 
   public async search(query: string): Promise<SearchResults> {
     return this.searchAll(query);
+  }
+
+  private playlistCache = new Map<string, OnlinePlaylist[]>();
+
+  public async searchByCategory(
+    query: string,
+    category: SearchCategory,
+    options: { providerIds?: string[]; signal?: AbortSignal } = {}
+  ): Promise<SearchResults> {
+    const clean = normalizeUnicodeQuery(query);
+    if (!clean) return { tracks: [], artists: [], albums: [], playlists: [] };
+
+    if (category === 'playlists') {
+      const cached = this.playlistCache.get(clean);
+      if (cached) return { tracks: [], artists: [], albums: [], playlists: cached };
+      const playlists = await jiosaavnProvider.searchPlaylists(clean).catch(() => []);
+      if (options.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+      if (playlists.length > 0) this.playlistCache.set(clean, playlists);
+      return { tracks: [], artists: [], albums: [], playlists };
+    }
+
+    const [base, playlists] = await Promise.all([
+      this.searchAll(clean, options),
+      category === 'all'
+        ? (this.playlistCache.get(clean)
+            ? Promise.resolve(this.playlistCache.get(clean)!)
+            : jiosaavnProvider.searchPlaylists(clean).then((res) => {
+                if (res.length > 0) this.playlistCache.set(clean, res);
+                return res;
+              }).catch(() => [] as OnlinePlaylist[]))
+        : Promise.resolve([] as OnlinePlaylist[]),
+    ]);
+
+    return {
+      ...base,
+      playlists,
+    };
+  }
+
+  public async getAlbumDetail(id: string): Promise<AlbumDetail> {
+    const inferred = this.inferProviderFromId(id);
+    const ordered = this.getMetadataProviders(inferred);
+    let lastError: unknown;
+    for (const provider of ordered) {
+      try {
+        const album = await provider.getAlbum(id);
+        this.recordSuccess(provider.name);
+        const totalDuration = album.tracks.reduce((acc, t) => acc + (t.duration || 0), 0);
+        return { ...album, totalDuration, provider: provider.name };
+      } catch (err) {
+        lastError = err;
+      }
+    }
+    throw lastError instanceof Error ? lastError : new Error(`Failed to fetch album: ${id}`);
+  }
+
+  public async getArtistDetail(id: string, fallbackName?: string): Promise<ArtistDetail> {
+    const inferred = this.inferProviderFromId(id);
+    if (inferred) {
+      const ordered = this.getMetadataProviders(inferred);
+      for (const provider of ordered) {
+        try {
+          const artist = await provider.getArtist(id);
+          this.recordSuccess(provider.name);
+          return { ...artist, provider: provider.name };
+        } catch {
+          // Try next or fallback to search
+        }
+      }
+    }
+    const queryName = fallbackName || id.replace(/^name:/, '');
+    const results = await this.searchAll(queryName);
+    const matchedArtist = results.artists.find(
+      (a) => a.name.toLowerCase() === queryName.toLowerCase()
+    ) ?? results.artists[0];
+    return {
+      id: matchedArtist?.id ?? id,
+      name: matchedArtist?.name ?? queryName,
+      picture: matchedArtist?.picture ?? results.tracks[0]?.cover,
+      topTracks: results.tracks.slice(0, 15),
+      albums: results.albums,
+    };
+  }
+
+  public async getPlaylistDetail(id: string): Promise<OnlinePlaylist & { tracks: Track[] }> {
+    return jiosaavnProvider.getPlaylist(id);
   }
 
   private inferProviderFromId(id: string): string | undefined {

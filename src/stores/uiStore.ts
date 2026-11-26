@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { SearchResults } from '../services/music/types';
+import type { SearchCategory, SearchResults } from '../services/music/types';
 
 export type AppPage = 'home' | 'search' | 'library' | 'settings' | 'now-playing';
 
@@ -12,6 +12,7 @@ export type VisualizationMode =
   | 'orbit'
   | 'particle'
   | 'wave'
+  | 'spotify'
   | 'spectrum'
   | 'waveform'
   | 'none';
@@ -33,6 +34,8 @@ export type BackgroundMode =
 
 export type OverlayMode = 'none' | 'queue' | 'lyrics';
 
+export type LyricsDisplayMode = 'normal' | 'spotify';
+
 export interface UIState {
   currentPage: AppPage;
   sidebarOpen: boolean;
@@ -41,7 +44,9 @@ export interface UIState {
   backgroundMode: BackgroundMode;
   immersiveMode: boolean;
   overlayMode: OverlayMode;
+  lyricsDisplayMode: LyricsDisplayMode;
   searchQuery: string;
+  searchCategory: SearchCategory;
   searchResults: SearchResults | null;
   isSearching: boolean;
 
@@ -55,7 +60,9 @@ export interface UIState {
   setImmersiveMode: (immersive: boolean) => void;
   toggleImmersiveMode: () => void;
   setOverlayMode: (mode: OverlayMode) => void;
+  setLyricsDisplayMode: (mode: LyricsDisplayMode) => void;
   setSearchQuery: (query: string) => void;
+  setSearchCategory: (category: SearchCategory) => void;
   setSearchResults: (results: SearchResults | null) => void;
   setIsSearching: (searching: boolean) => void;
 }
@@ -68,7 +75,9 @@ export const useUIStore = create<UIState>((set) => ({
   backgroundMode: 'starfield',
   immersiveMode: false,
   overlayMode: 'none',
+  lyricsDisplayMode: (typeof localStorage !== 'undefined' ? localStorage.getItem('nocturne-lyrics-display-mode') as 'normal' | 'spotify' : null) || 'normal',
   searchQuery: '',
+  searchCategory: 'all',
   searchResults: null,
   isSearching: false,
 
@@ -84,7 +93,12 @@ export const useUIStore = create<UIState>((set) => ({
   toggleImmersiveMode: () =>
     set((state) => ({ immersiveMode: !state.immersiveMode })),
   setOverlayMode: (mode) => set({ overlayMode: mode }),
+  setLyricsDisplayMode: (mode) => {
+    if (typeof localStorage !== 'undefined') localStorage.setItem('nocturne-lyrics-display-mode', mode);
+    set({ lyricsDisplayMode: mode });
+  },
   setSearchQuery: (query) => set({ searchQuery: query }),
+  setSearchCategory: (category) => set({ searchCategory: category }),
   setSearchResults: (results) => set({ searchResults: results }),
   setIsSearching: (searching) => set({ isSearching: searching }),
 }));

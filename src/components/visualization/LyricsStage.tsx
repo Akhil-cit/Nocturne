@@ -9,6 +9,7 @@ import {
 } from '@/visualization/backgrounds/backgroundEngine';
 import { renderLyricsMode } from '@/visualization/modes/lyricsModes';
 import { ConstellationView } from './ConstellationView';
+import { SpotifyLyrics } from '@/components/player/SpotifyLyrics';
 
 export interface BackgroundEngineCanvasProps {
   accentColor?: string;
@@ -216,11 +217,15 @@ export const LyricsStage: React.FC<LyricsStageProps> = ({
         fullscreen ? 'fixed inset-0 z-0' : 'relative h-full w-full'
       } overflow-hidden bg-[#050507] ${className}`}
     >
-      <BackgroundEngineCanvas accentColor={accentColor} />
+      {visualizationMode !== 'spotify' && (
+        <BackgroundEngineCanvas accentColor={accentColor} />
+      )}
 
-      <div className="relative z-10 h-full w-full">
+      <div className="relative z-10 h-full w-full flex flex-col">
         {visualizationMode === 'constellation' ? (
           <ConstellationView accentColor={accentColor} config={constellationConfig} />
+        ) : visualizationMode === 'spotify' ? (
+          <SpotifyLyrics />
         ) : (
           renderLyricsMode(visualizationMode, accentColor)
         )}

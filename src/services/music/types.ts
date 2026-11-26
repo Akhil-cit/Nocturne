@@ -66,6 +66,7 @@ export interface Artist {
   id: string;
   name: string;
   picture?: string;
+  provider?: string;
 }
 
 export interface Album {
@@ -73,14 +74,45 @@ export interface Album {
   title: string;
   cover: string;
   artist?: string;
+  artistId?: string;
   releaseDate?: string;
   trackCount?: number;
+  albumType?: string;
+  provider?: string;
 }
+
+export interface OnlinePlaylist {
+  id: string;
+  title: string;
+  description?: string;
+  cover: string;
+  creator?: string;
+  trackCount?: number;
+  provider: string;
+  tracks?: Track[];
+  url?: string;
+}
+
+export type SearchCategory = 'all' | 'tracks' | 'albums' | 'artists' | 'playlists';
 
 export interface SearchResults {
   tracks: Track[];
   artists: Artist[];
   albums: Album[];
+  playlists?: OnlinePlaylist[];
+}
+
+export interface ArtistDetail extends Artist {
+  bio?: string;
+  topTracks: Track[];
+  albums: Album[];
+  singles?: Album[];
+  relatedArtists?: Artist[];
+}
+
+export interface AlbumDetail extends Album {
+  tracks: Track[];
+  totalDuration?: number;
 }
 
 export interface MusicDiscoveryProvider {
