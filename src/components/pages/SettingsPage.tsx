@@ -66,7 +66,7 @@ export function SettingsPage() {
   const [backupMeta, setBackupMeta] = useState(() => getLastBackupMeta());
   const [pendingBackup, setPendingBackup] = useState<NocturneBackupPayload | null>(null);
   const [backupStatus, setBackupStatus] = useState<string | null>(null);
-  const [updateStatus, setUpdateStatus] = useState<string>('Up to date (v0.1.0)');
+  const [updateStatus, setUpdateStatus] = useState<string>('Up to date (v0.1.1)');
   const [checkingUpdate, setCheckingUpdate] = useState(false);
 
   const handleCheckUpdates = async () => {
@@ -79,7 +79,7 @@ export function SettingsPage() {
       }
       const data = (await res.json()) as { tag_name?: string; html_url?: string };
       const latest = data.tag_name ?? 'unknown';
-      setUpdateStatus(latest === 'v0.1.0' ? 'Up to date (v0.1.0)' : `Update available: ${latest}`);
+      setUpdateStatus(latest === 'v0.1.1' ? 'Up to date (v0.1.1)' : `Update available: ${latest}`);
     } catch {
       setUpdateStatus('Unable to check for updates (offline).');
     } finally {

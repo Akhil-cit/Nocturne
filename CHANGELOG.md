@@ -6,6 +6,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and 
 
 ---
 
+## [0.1.1] — 2026-11-27
+
+### Added
+- Root `LICENSE` (Apache-2.0) and release documentation (`ARCHITECTURE.md`, `KNOWN_ISSUES.md`, `SECURITY_AUDIT.md`).
+- Universal Search categories (`All`, `Tracks`, `Albums`, `Artists`, `Playlists`), Artist/Album/Online Playlist pages, and cached `<ArtworkImage />` resolution.
+- Spotify-style lyrics mode with dynamic album-derived background, `SleepTimerButton`, `TrackContextMenu`, `PlaylistPickerModal`, `InsightsPage`, Nocturne Wrapped, and `.nocturne-backup` export/restore.
+
+---
+
 ## [0.1.0] — 2026-11-25
 
 ### Added

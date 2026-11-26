@@ -49,7 +49,7 @@ export function createBackupPayload(): NocturneBackupPayload {
     format: 'nocturne-backup',
     version: 1,
     createdAt: Date.now(),
-    appVersion: '0.1.0',
+    appVersion: '0.1.1',
     library: {
       favorites: lib.favorites.map(stripStream),
       playlists: lib.playlists.map((p) => ({ ...p, tracks: p.tracks.map(stripStream) })),
