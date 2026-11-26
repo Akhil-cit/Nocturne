@@ -4,7 +4,7 @@ import path from 'node:path';
 import os from 'node:os';
 import fs from 'node:fs';
 
-const APP_PATH = path.join('D:', 'Music', 'nocturne', 'release-v15', 'win-unpacked', 'Nocturne.exe');
+const APP_PATH = path.join('D:', 'Music', 'nocturne', 'release-v20', 'win-unpacked', 'Nocturne.exe');
 
 async function run() {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'nocturne-search-test-'));

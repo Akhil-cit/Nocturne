@@ -13,6 +13,15 @@ import Button from '@/components/ui/Button';
 import Slider from '@/components/ui/Slider';
 import type { AudioQualityPreference } from '@/services/music/types';
 import { useProviderStore } from '@/stores/providerStore';
+import { useTransitionStore } from '@/stores/transitionStore';
+import { useRecommendationStore } from '@/stores/recommendationStore';
+import {
+  exportBackupFile,
+  getLastBackupMeta,
+  parseAndValidateBackup,
+  restoreBackupPayload,
+  type NocturneBackupPayload,
+} from '@/services/backup/backupService';
 import {
   useStudioStore,
   type FpsLimit,
@@ -44,6 +53,39 @@ export function SettingsPage() {
   const health = useProviderStore((s) => s.health);
   const setProviderEnabled = useProviderStore((s) => s.setProviderEnabled);
   const setPreferredQuality = useProviderStore((s) => s.setPreferredQuality);
+  const crossfadeEnabled = useTransitionStore((s) => s.crossfadeEnabled);
+  const setCrossfadeEnabled = useTransitionStore((s) => s.setCrossfadeEnabled);
+  const crossfadeDurationSec = useTransitionStore((s) => s.crossfadeDurationSec);
+  const setCrossfadeDurationSec = useTransitionStore((s) => s.setCrossfadeDurationSec);
+  const gaplessEnabled = useTransitionStore((s) => s.gaplessEnabled);
+  const setGaplessEnabled = useTransitionStore((s) => s.setGaplessEnabled);
+  const preserveAlbumGapless = useTransitionStore((s) => s.preserveAlbumGapless);
+  const setPreserveAlbumGapless = useTransitionStore((s) => s.setPreserveAlbumGapless);
+  const autoplayEnabled = useRecommendationStore((s) => s.autoplayEnabled);
+  const setAutoplayEnabled = useRecommendationStore((s) => s.setAutoplayEnabled);
+  const [backupMeta, setBackupMeta] = useState(() => getLastBackupMeta());
+  const [pendingBackup, setPendingBackup] = useState<NocturneBackupPayload | null>(null);
+  const [backupStatus, setBackupStatus] = useState<string | null>(null);
+  const [updateStatus, setUpdateStatus] = useState<string>('Up to date (v0.1.0)');
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+
+  const handleCheckUpdates = async () => {
+    setCheckingUpdate(true);
+    try {
+      const res = await fetch('https://api.github.com/repos/Akhil-cit/Nocturne/releases/latest');
+      if (!res.ok) {
+        setUpdateStatus('No published releases found yet.');
+        return;
+      }
+      const data = (await res.json()) as { tag_name?: string; html_url?: string };
+      const latest = data.tag_name ?? 'unknown';
+      setUpdateStatus(latest === 'v0.1.0' ? 'Up to date (v0.1.0)' : `Update available: ${latest}`);
+    } catch {
+      setUpdateStatus('Unable to check for updates (offline).');
+    } finally {
+      setCheckingUpdate(false);
+    }
+  };
   const setAutoFallback = useProviderStore((s) => s.setAutoFallback);
   const setSearchAllProviders = useProviderStore((s) => s.setSearchAllProviders);
   const refreshHealth = useProviderStore((s) => s.refreshHealth);
@@ -178,6 +220,236 @@ export function SettingsPage() {
               </option>
             ))}
           </select>
+        </div>
+
+        {/* Playback Transitions */}
+        <div className="space-y-4 pt-3 border-t border-white/[0.06]">
+          <p className="text-xs font-medium uppercase tracking-wider text-white/45">
+            Playback Transitions
+          </p>
+
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm text-white/85">Crossfade</p>
+              <p className="text-xs text-white/45">
+                Smoothly blend the end of one track into the next
+              </p>
+            </div>
+            <button
+              type="button"
+              data-testid="toggle-crossfade"
+              onClick={() => setCrossfadeEnabled(!crossfadeEnabled)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-colors cursor-pointer ${
+                crossfadeEnabled
+                  ? 'bg-white text-[#0a0a0a]'
+                  : 'bg-white/[0.06] text-white/60 hover:text-white'
+              }`}
+            >
+              {crossfadeEnabled ? 'On' : 'Off'}
+            </button>
+          </div>
+
+          {crossfadeEnabled && (
+            <div className="flex items-center justify-between gap-4 pl-2">
+              <span className="text-xs text-white/70">
+                Duration: <strong className="text-white tabular-nums">{crossfadeDurationSec}s</strong>
+              </span>
+              <input
+                type="range"
+                min={0}
+                max={12}
+                step={1}
+                value={crossfadeDurationSec}
+                onChange={(e) => setCrossfadeDurationSec(Number(e.target.value))}
+                className="w-44 accent-white cursor-pointer"
+              />
+            </div>
+          )}
+
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm text-white/85">Gapless Playback</p>
+              <p className="text-xs text-white/45">
+                Preload the next track for seamless transitions
+              </p>
+            </div>
+            <button
+              type="button"
+              data-testid="toggle-gapless"
+              onClick={() => setGaplessEnabled(!gaplessEnabled)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-colors cursor-pointer ${
+                gaplessEnabled
+                  ? 'bg-white text-[#0a0a0a]'
+                  : 'bg-white/[0.06] text-white/60 hover:text-white'
+              }`}
+            >
+              {gaplessEnabled ? 'On' : 'Off'}
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm text-white/85">Preserve Album Transitions</p>
+              <p className="text-xs text-white/45">
+                Prioritize gapless playback for consecutive tracks on the same album
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setPreserveAlbumGapless(!preserveAlbumGapless)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-colors cursor-pointer ${
+                preserveAlbumGapless
+                  ? 'bg-white text-[#0a0a0a]'
+                  : 'bg-white/[0.06] text-white/60 hover:text-white'
+              }`}
+            >
+              {preserveAlbumGapless ? 'On' : 'Off'}
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm text-white/85">Autoplay</p>
+              <p className="text-xs text-white/45">
+                Keep playing similar tracks when your queue ends
+              </p>
+            </div>
+            <button
+              type="button"
+              data-testid="toggle-autoplay"
+              onClick={() => setAutoplayEnabled(!autoplayEnabled)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-colors cursor-pointer ${
+                autoplayEnabled
+                  ? 'bg-white text-[#0a0a0a]'
+                  : 'bg-white/[0.06] text-white/60 hover:text-white'
+              }`}
+            >
+              {autoplayEnabled ? 'On' : 'Off'}
+            </button>
+          </div>
+        </div>
+
+        {/* Backup & Restore */}
+        <div className="space-y-3 pt-3 border-t border-white/[0.06]">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wider text-white/45">
+                Backup & Restore
+              </p>
+              <p className="text-xs text-white/45 mt-1">
+                {backupMeta
+                  ? `Last backup: ${new Date(backupMeta.createdAt).toLocaleString()} (${Math.round(backupMeta.sizeBytes / 1024)} KB)`
+                  : 'Export your playlists, liked songs, and settings locally (.nocturne-backup)'}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                data-testid="create-backup-btn"
+                onClick={() => {
+                  const meta = exportBackupFile();
+                  setBackupMeta(meta);
+                  setBackupStatus('Backup exported successfully.');
+                }}
+                className="px-3 py-1.5 rounded-xl bg-white text-[#0a0a0a] text-xs font-medium cursor-pointer"
+              >
+                Create Backup
+              </button>
+              <label className="px-3 py-1.5 rounded-xl bg-white/[0.08] hover:bg-white/15 text-xs text-white cursor-pointer">
+                Restore
+                <input
+                  type="file"
+                  accept=".nocturne-backup,.json"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    void file.text().then((txt) => {
+                      try {
+                        setPendingBackup(parseAndValidateBackup(txt));
+                        setBackupStatus(null);
+                      } catch (err) {
+                        setBackupStatus(err instanceof Error ? err.message : 'Invalid backup file.');
+                      }
+                    });
+                  }}
+                />
+              </label>
+            </div>
+          </div>
+
+          {pendingBackup && (
+            <div className="p-3 rounded-xl bg-white/[0.05] border border-white/12 space-y-2 text-xs">
+              <p className="text-white font-medium">
+                Backup from {new Date(pendingBackup.createdAt).toLocaleDateString()} ·{' '}
+                {pendingBackup.library.playlists.length} playlists ·{' '}
+                {pendingBackup.library.favorites.length} liked songs
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    restoreBackupPayload(pendingBackup, 'merge');
+                    setPendingBackup(null);
+                    setBackupStatus('Backup merged with your library.');
+                  }}
+                  className="px-3 py-1 rounded-lg bg-white text-[#0a0a0a] font-medium cursor-pointer"
+                >
+                  Merge
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    restoreBackupPayload(pendingBackup, 'replace');
+                    setPendingBackup(null);
+                    setBackupStatus('Library replaced from backup.');
+                  }}
+                  className="px-3 py-1 rounded-lg bg-red-500/20 text-red-200 font-medium cursor-pointer"
+                >
+                  Replace
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPendingBackup(null)}
+                  className="px-3 py-1 rounded-lg bg-white/10 text-white/70 cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {backupStatus && <p className="text-xs text-emerald-300">{backupStatus}</p>}
+        </div>
+
+        {/* About & Updates */}
+        <div className="space-y-2 pt-3 border-t border-white/[0.06]">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wider text-white/45">
+                About & Updates
+              </p>
+              <p className="text-xs text-white/60 mt-1">{updateStatus}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                data-testid="check-updates-btn"
+                disabled={checkingUpdate}
+                onClick={() => void handleCheckUpdates()}
+                className="px-3 py-1.5 rounded-xl bg-white/[0.08] hover:bg-white/15 text-xs text-white cursor-pointer disabled:opacity-50"
+              >
+                {checkingUpdate ? 'Checking...' : 'Check for Updates'}
+              </button>
+              <button
+                type="button"
+                onClick={() => void window.electronAPI?.openExternal('https://github.com/Akhil-cit/Nocturne/releases')}
+                className="px-3 py-1.5 rounded-xl bg-white/[0.05] hover:bg-white/12 text-xs text-white/75 cursor-pointer"
+              >
+                GitHub Releases
+              </button>
+            </div>
+          </div>
         </div>
 
         <div className="flex items-center justify-between gap-4 pt-2 border-t border-white/[0.06]">

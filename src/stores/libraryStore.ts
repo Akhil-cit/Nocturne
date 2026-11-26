@@ -3,6 +3,12 @@ import type { Album, Artist, OnlinePlaylist, RepeatMode, Track } from '@/service
 import { musicProviderManager } from '@/services/music/provider';
 import { playbackEngine } from '@/services/playback/engine';
 
+export interface PlaylistFolder {
+  id: string;
+  name: string;
+  createdAt: number;
+}
+
 export interface Playlist {
   id: string;
   name: string;
@@ -10,6 +16,8 @@ export interface Playlist {
   createdAt: number;
   description?: string;
   cover?: string;
+  pinned?: boolean;
+  folderId?: string | null;
   sourcePlatform?: string;
   sourceUrl?: string;
   updatedAt?: number;
@@ -39,8 +47,15 @@ export interface LibraryState {
   savedArtists: Artist[];
   savedAlbums: Album[];
   savedOnlinePlaylists: OnlinePlaylist[];
+  folders: PlaylistFolder[];
   preferences: LibraryPreferences;
   hydrated: boolean;
+
+  togglePinPlaylist: (id: string) => void;
+  createFolder: (name: string) => void;
+  renameFolder: (id: string, name: string) => void;
+  deleteFolder: (id: string) => void;
+  movePlaylistToFolder: (playlistId: string, folderId: string | null) => void;
 
   toggleSaveArtist: (artist: Artist) => void;
   isArtistSaved: (artistId: string) => boolean;
@@ -171,6 +186,48 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
   savedOnlinePlaylists: (() => {
     try { return JSON.parse(localStorage.getItem('nocturne-saved-online-playlists') || '[]'); } catch { return []; }
   })(),
+  folders: (() => {
+    try { return JSON.parse(localStorage.getItem('nocturne-playlist-folders-v1') || '[]'); } catch { return []; }
+  })(),
+
+  togglePinPlaylist: (id) => {
+    set((s) => ({
+      playlists: s.playlists.map((p) => (p.id === id ? { ...p, pinned: !p.pinned, updatedAt: Date.now() } : p)),
+    }));
+  },
+  createFolder: (name) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    set((s) => {
+      const next = [...s.folders, { id: `folder-${Date.now()}`, name: trimmed, createdAt: Date.now() }];
+      try { localStorage.setItem('nocturne-playlist-folders-v1', JSON.stringify(next)); } catch {}
+      return { folders: next };
+    });
+  },
+  renameFolder: (id, name) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    set((s) => {
+      const next = s.folders.map((f) => (f.id === id ? { ...f, name: trimmed } : f));
+      try { localStorage.setItem('nocturne-playlist-folders-v1', JSON.stringify(next)); } catch {}
+      return { folders: next };
+    });
+  },
+  deleteFolder: (id) => {
+    set((s) => {
+      const next = s.folders.filter((f) => f.id !== id);
+      try { localStorage.setItem('nocturne-playlist-folders-v1', JSON.stringify(next)); } catch {}
+      return {
+        folders: next,
+        playlists: s.playlists.map((p) => (p.folderId === id ? { ...p, folderId: null } : p)),
+      };
+    });
+  },
+  movePlaylistToFolder: (playlistId, folderId) => {
+    set((s) => ({
+      playlists: s.playlists.map((p) => (p.id === playlistId ? { ...p, folderId, updatedAt: Date.now() } : p)),
+    }));
+  },
 
   toggleSaveArtist: (artist) => {
     set((s) => {

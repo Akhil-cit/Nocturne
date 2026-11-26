@@ -26,6 +26,7 @@ import {
 } from './trackMatcher';
 import { tracksProvider, TracksProvider } from './tracksProvider';
 import { jiosaavnProvider, JioSaavnProvider } from './jiosaavnProvider';
+import { resolveArtwork } from './artworkResolver';
 
 interface LocalElectronBridge {
   openAudioFiles?: () => Promise<string[]>;
@@ -642,11 +643,21 @@ export class MusicProviderManager implements ProviderHealthMonitor {
       }
       for (const a of res.value.artists) {
         const key = a.name.toLowerCase();
-        if (!artistMap.has(key)) artistMap.set(key, a);
+        const existing = artistMap.get(key);
+        if (!existing) {
+          artistMap.set(key, a);
+        } else if (!existing.picture && a.picture) {
+          artistMap.set(key, { ...existing, picture: a.picture });
+        }
       }
       for (const al of res.value.albums) {
         const key = `${al.title.toLowerCase()}::${(al.artist ?? '').toLowerCase()}`;
-        if (!albumMap.has(key)) albumMap.set(key, al);
+        const existing = albumMap.get(key);
+        if (!existing) {
+          albumMap.set(key, al);
+        } else if (!existing.cover && al.cover) {
+          albumMap.set(key, { ...existing, cover: al.cover });
+        }
       }
     }
 
@@ -718,8 +729,15 @@ export class MusicProviderManager implements ProviderHealthMonitor {
       try {
         const album = await provider.getAlbum(id);
         this.recordSuccess(provider.name);
-        const totalDuration = album.tracks.reduce((acc, t) => acc + (t.duration || 0), 0);
-        return { ...album, totalDuration, provider: provider.name };
+        let cover = album.cover || album.tracks.find((t) => t.cover)?.cover || '';
+        if (!cover && album.title) {
+          cover = (await resolveArtwork({ type: 'album', title: album.title, artist: album.artist })) ?? '';
+        }
+        const tracks = cover
+          ? album.tracks.map((t) => (t.cover ? t : { ...t, cover }))
+          : album.tracks;
+        const totalDuration = tracks.reduce((acc, t) => acc + (t.duration || 0), 0);
+        return { ...album, cover, tracks, totalDuration, provider: provider.name };
       } catch (err) {
         lastError = err;
       }

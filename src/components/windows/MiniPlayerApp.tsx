@@ -78,8 +78,20 @@ const SynchronizedLyricTicker: React.FC<SynchronizedLyricTickerProps> = ({
     if (words && words.length > 0 && wordIndex >= 0 && wordIndex < words.length) {
       const wordEl = wordRefs.current[wordIndex];
       if (wordEl) {
-        const wordCenter = wordEl.offsetLeft + wordEl.offsetWidth / 2;
-        const desired = wordCenter - viewportWidth * 0.42;
+        const leftSafe = viewportWidth * 0.1;
+        const rightSafe = viewportWidth * 0.9;
+        const wordLeft = wordEl.offsetLeft;
+        const wordRight = wordLeft + wordEl.offsetWidth;
+        const wordCenter = wordLeft + wordEl.offsetWidth / 2;
+        let desired = wordCenter - viewportWidth * 0.42;
+        // Never let the active word's left edge slip into the left fade mask
+        if (wordLeft - desired < leftSafe) {
+          desired = wordLeft - leftSafe;
+        }
+        // Keep the active word's right edge inside the right safe zone when it fits
+        if (wordEl.offsetWidth < rightSafe - leftSafe && wordRight - desired > rightSafe) {
+          desired = wordRight - rightSafe;
+        }
         target = Math.max(0, Math.min(overflowPx, desired));
       } else {
         const ratio = Math.max(0, Math.min(1, (wordIndex + 0.5) / words.length));
@@ -100,9 +112,9 @@ const SynchronizedLyricTicker: React.FC<SynchronizedLyricTickerProps> = ({
     overflowPx > 0
       ? ({
           maskImage:
-            'linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%)',
+            'linear-gradient(to right, transparent 0%, black 4%, black 96%, transparent 100%)',
           WebkitMaskImage:
-            'linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%)',
+            'linear-gradient(to right, transparent 0%, black 4%, black 96%, transparent 100%)',
         } as React.CSSProperties)
       : undefined;
 

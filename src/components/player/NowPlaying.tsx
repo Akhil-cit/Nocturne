@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import {
   ArrowLeft,
+  Heart,
   Languages,
   Maximize2,
   Minimize2,
+  MoreHorizontal,
   Music,
   Pause,
   PictureInPicture2,
@@ -21,6 +23,10 @@ import {
   Upload,
 } from 'lucide-react';
 import Slider from '@/components/ui/Slider';
+import TrackContextMenu from '@/components/ui/TrackContextMenu';
+import PlaylistPickerModal from '@/components/ui/PlaylistPickerModal';
+import ArtworkImage from '@/components/ui/ArtworkImage';
+import { useLibraryStore } from '@/stores/libraryStore';
 import { importLrcForTrack, importLrcFromFile } from '@/services/lyrics/importer';
 import { SUPPORTED_LANGUAGES } from '@/services/translation/languageDetector';
 import { usePlayerStore } from '@/stores/playerStore';
@@ -92,6 +98,10 @@ export function NowPlaying() {
   const [showAudioInfo, setShowAudioInfo] = useState(false);
   const [showTranslateMenu, setShowTranslateMenu] = useState(false);
   const [userScrolledAway, setUserScrolledAway] = useState(false);
+  const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const favorites = useLibraryStore((s) => s.favorites);
+  const toggleFavorite = useLibraryStore((s) => s.toggleFavorite);
 
   const translationMode = useTranslationStore((s) => s.mode);
   const setTranslationMode = useTranslationStore((s) => s.setMode);
@@ -130,12 +140,22 @@ export function NowPlaying() {
     const lineEl = activeLineRef.current;
     if (!container || !lineEl) return;
 
-    const targetTop = Math.max(
-      0,
-      lineEl.offsetTop - container.clientHeight / 2 + lineEl.clientHeight / 2
-    );
-    container.scrollTo({ top: targetTop, behavior: 'smooth' });
-  }, [currentLyricLine, showTranslateMenu, userScrolledAway]);
+    const containerRect = container.getBoundingClientRect();
+    const lineRect = lineEl.getBoundingClientRect();
+    const targetTop =
+      container.scrollTop +
+      (lineRect.top - containerRect.top) -
+      container.clientHeight * 0.36;
+    container.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
+  }, [
+    currentLyricLine,
+    lyrics,
+    translations,
+    translationMode,
+    translationFontSize,
+    showTranslateMenu,
+    userScrolledAway,
+  ]);
 
   const handleFullscreenToggle = async () => {
     const nextImmersive = !immersiveMode;
@@ -247,30 +267,61 @@ export function NowPlaying() {
         </div>
       </div>
 
-      {/* Center Content */}
-      <div className="relative z-10 flex-1 flex flex-col lg:flex-row items-center justify-center gap-12 px-8 py-6 max-w-6xl w-full mx-auto">
+      {/* Center Content — Responsive 40/60 Two-Column Layout */}
+      <div className="relative z-10 flex-1 grid grid-cols-1 lg:grid-cols-[minmax(300px,40%)_minmax(420px,60%)] items-center justify-items-center gap-8 lg:gap-12 px-6 lg:px-12 py-4 max-w-7xl w-full mx-auto">
         {/* Artwork + Track Metadata + Full Playback Controls */}
         <motion.div
           initial={{ opacity: 0, scale: 0.97 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.25 }}
-          className="flex flex-col items-center text-center w-full max-w-[340px]"
+          className="flex flex-col items-center text-center w-full max-w-[380px]"
         >
-          <div className="w-[300px] h-[300px] rounded-2xl bg-white/[0.04] border border-white/12 shadow-2xl shadow-black/80 overflow-hidden flex items-center justify-center mb-6">
-            {currentTrack?.cover ? (
-              <img
+          <div className="w-[clamp(220px,24vw,380px)] h-[clamp(220px,24vw,380px)] rounded-2xl bg-white/[0.04] border border-white/12 shadow-2xl shadow-black/80 overflow-hidden flex items-center justify-center mb-5">
+            {currentTrack ? (
+              <ArtworkImage
+                key={currentTrack.id}
                 src={currentTrack.cover}
                 alt={currentTrack.title}
+                type="track"
+                title={currentTrack.title}
+                artist={currentTrack.artist}
                 className="w-full h-full object-cover"
+                iconClassName="w-16 h-16 text-white/20"
               />
             ) : (
               <Music className="w-16 h-16 text-white/20" />
             )}
           </div>
 
-          <h1 className="text-xl font-semibold text-white tracking-tight truncate max-w-full">
-            {currentTrack?.title ?? 'No track playing'}
-          </h1>
+          <div className="flex items-center justify-center gap-2 max-w-full">
+            <h1 className="text-xl font-semibold text-white tracking-tight truncate">
+              {currentTrack?.title ?? 'No track playing'}
+            </h1>
+            {currentTrack && (
+              <>
+                <button
+                  type="button"
+                  data-testid="nowplaying-like-btn"
+                  onClick={() => toggleFavorite(currentTrack)}
+                  title={favorites.some((f) => f.id === currentTrack.id) ? 'Remove from Liked Songs' : 'Add to Liked Songs'}
+                  aria-label="Like track"
+                  className="p-1.5 rounded-full text-white/60 hover:text-white hover:bg-white/10 transition-colors cursor-pointer shrink-0"
+                >
+                  <Heart className={`w-4 h-4 ${favorites.some((f) => f.id === currentTrack.id) ? 'fill-emerald-400 text-emerald-400' : ''}`} />
+                </button>
+                <button
+                  type="button"
+                  data-testid="nowplaying-more-btn"
+                  onClick={(e) => setMenuPos({ x: e.clientX, y: e.clientY })}
+                  title="Track options"
+                  aria-label="Track options"
+                  className="p-1.5 rounded-full text-white/60 hover:text-white hover:bg-white/10 transition-colors cursor-pointer shrink-0"
+                >
+                  <MoreHorizontal className="w-4 h-4" />
+                </button>
+              </>
+            )}
+          </div>
           <p className="text-sm text-white/55 mt-1 truncate max-w-full">
             {currentTrack?.artist ?? 'Select a song from Home or Search'}
           </p>
@@ -316,6 +367,10 @@ export function NowPlaying() {
                   <div className="flex justify-between">
                     <span className="text-white/45">Actual Media Duration</span>
                     <span>{source?.duration ? formatTime(source.duration) : 'Unknown'}</span>
+                  </div>
+                  <div className="flex justify-between pt-1 border-t border-white/10">
+                    <span className="text-white/45">Classification</span>
+                    <span>{source?.quality?.toLowerCase().includes('lossless') || source?.codec?.toLowerCase().includes('flac') ? 'Lossless' : source?.codec ? 'Lossy' : 'Unknown'}</span>
                   </div>
                 </div>
               )}
@@ -451,7 +506,7 @@ export function NowPlaying() {
         {/* Lyrics Display Area */}
         {lyricsDisplayMode === 'spotify' ? (
           /* Spotify-style immersive lyrics */
-          <div className="w-full max-w-lg h-[420px] rounded-2xl bg-white/[0.03] backdrop-blur-xl border border-white/[0.08] overflow-hidden flex flex-col">
+          <div className="w-full max-w-[680px] h-[clamp(380px,62vh,600px)] rounded-2xl bg-white/[0.03] backdrop-blur-xl border border-white/[0.08] overflow-hidden flex flex-col">
             {/* Spotify mode header */}
             <div className="flex items-center justify-between gap-2 px-5 pt-4 pb-2 shrink-0">
               <div className="flex items-center gap-2">
@@ -551,7 +606,7 @@ export function NowPlaying() {
           </div>
         ) : (
           /* Normal lyrics panel */
-          <div className="w-full max-w-md h-[380px] rounded-2xl bg-white/[0.03] backdrop-blur-xl border border-white/[0.08] p-6 overflow-y-auto overflow-x-hidden flex flex-col">
+          <div className="w-full max-w-[680px] h-[clamp(380px,62vh,600px)] rounded-2xl bg-white/[0.03] backdrop-blur-xl border border-white/[0.08] p-6 lg:p-7 overflow-y-auto overflow-x-hidden flex flex-col">
           <div className="flex flex-wrap items-center justify-between gap-2 mb-3 shrink-0">
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium uppercase tracking-widest text-white/40">
@@ -791,11 +846,13 @@ export function NowPlaying() {
                   const container = lyricsScrollRef.current;
                   const lineEl = activeLineRef.current;
                   if (container && lineEl) {
-                    const targetTop = Math.max(
-                      0,
-                      lineEl.offsetTop - container.clientHeight / 2 + lineEl.clientHeight / 2
-                    );
-                    container.scrollTo({ top: targetTop, behavior: 'smooth' });
+                    const containerRect = container.getBoundingClientRect();
+                    const lineRect = lineEl.getBoundingClientRect();
+                    const targetTop =
+                      container.scrollTop +
+                      (lineRect.top - containerRect.top) -
+                      container.clientHeight * 0.36;
+                    container.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
                   }
                 }}
                 className="px-2.5 py-1 rounded-full bg-white/15 hover:bg-white/25 text-[11px] text-white transition-colors cursor-pointer"
@@ -814,7 +871,7 @@ export function NowPlaying() {
               ref={lyricsScrollRef}
               onWheel={() => setUserScrolledAway(true)}
               onTouchStart={() => setUserScrolledAway(true)}
-              className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pr-1 space-y-3 py-4"
+              className="relative flex-1 min-h-0 overflow-y-auto overflow-x-hidden pr-1 space-y-3 pt-6 pb-16"
               style={{ fontFamily, wordBreak: 'break-word' }}
             >
               {lyrics.lines.map((line, idx) => {
@@ -823,37 +880,37 @@ export function NowPlaying() {
                 const translatedText = translations[idx];
                 const subSizeClass =
                   translationFontSize === 'sm'
-                    ? 'text-xs'
+                    ? 'text-sm lg:text-[15px]'
                     : translationFontSize === 'lg'
-                      ? 'text-base'
-                      : 'text-sm';
+                      ? 'text-lg lg:text-[19px]'
+                      : 'text-base lg:text-[17px]';
 
                 return (
                   <div
                     key={`${line.time}-${idx}`}
                     ref={isActive ? activeLineRef : undefined}
                     onClick={() => seek(line.time)}
-                    className={`leading-relaxed transition-all duration-300 cursor-pointer ${
+                    className={`leading-[1.55] transition-all duration-300 cursor-pointer py-0.5 ${
                       isActive
-                        ? 'text-white font-semibold scale-[1.02] origin-left'
+                        ? 'text-white font-semibold'
                         : isPast
-                          ? 'text-white/30 hover:text-white/60'
-                          : 'text-white/50 hover:text-white/80'
+                          ? 'text-white/45 hover:text-white/70'
+                          : 'text-white/65 hover:text-white/85'
                     }`}
                   >
                     {translationMode !== 'english' && (
-                      <p className="text-base">{line.text || '···'}</p>
+                      <p className="text-lg lg:text-[22px]">{line.text || '···'}</p>
                     )}
                     {translationMode === 'bilingual' && translatedText && (
                       <p
-                        className={`${subSizeClass} font-normal mt-0.5`}
+                        className={`${subSizeClass} font-normal mt-1`}
                         style={{ opacity: isActive ? Math.min(1, translationOpacity + 0.15) : translationOpacity }}
                       >
                         {translatedText}
                       </p>
                     )}
                     {translationMode === 'english' && (
-                      <p className="text-base">{translatedText || line.text || '···'}</p>
+                      <p className="text-lg lg:text-[22px]">{translatedText || line.text || '···'}</p>
                     )}
                   </div>
                 );
@@ -869,6 +926,16 @@ export function NowPlaying() {
         </div>
         )}
       </div>
+      <TrackContextMenu
+        track={menuPos ? currentTrack : null}
+        position={menuPos}
+        onClose={() => setMenuPos(null)}
+        onAddToPlaylist={() => setPickerOpen(true)}
+      />
+      <PlaylistPickerModal
+        track={pickerOpen ? currentTrack : null}
+        onClose={() => setPickerOpen(false)}
+      />
     </div>
   );
 }

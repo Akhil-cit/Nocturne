@@ -27,6 +27,7 @@ import type { Track } from '@/services/music/types';
 import { resolveImportedTrack } from '@/services/playlist/trackResolver';
 import { useImportStore } from '@/stores/importStore';
 import { useLibraryStore } from '@/stores/libraryStore';
+import { useClipboardStore } from '@/stores/clipboardStore';
 import { useOnRepeatStore } from '@/stores/onRepeatStore';
 import { usePlayerStore } from '@/stores/playerStore';
 
@@ -95,6 +96,75 @@ export function PlaylistDetailPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<TrackSort>('custom');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const copyTracks = useClipboardStore((s) => s.copy);
+  const cutTracks = useClipboardStore((s) => s.cut);
+  const clipboardTracks = useClipboardStore((s) => s.tracks);
+  const cutFromPlaylistId = useClipboardStore((s) => s.cutFromPlaylistId);
+  const showToast = useClipboardStore((s) => s.showToast);
+  const clipboardToast = useClipboardStore((s) => s.toast);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+        e.preventDefault();
+        setSelectedIds(new Set(displayedTracks.map((t) => t.id)));
+        showToast(`${displayedTracks.length} tracks selected`);
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c' && selectedIds.size > 0) {
+        e.preventDefault();
+        const sel = displayedTracks.filter((t) => selectedIds.has(t.id));
+        copyTracks(sel);
+        showToast(`${sel.length} tracks copied`);
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'x' && selectedIds.size > 0 && !isSpecial && id) {
+        e.preventDefault();
+        const sel = displayedTracks.filter((t) => selectedIds.has(t.id));
+        cutTracks(sel, id);
+        showToast(`${sel.length} tracks cut`);
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v' && clipboardTracks.length > 0 && id) {
+        e.preventDefault();
+        if (id === 'liked') {
+          let added = 0;
+          for (const t of clipboardTracks) {
+            if (!favorites.some((f) => f.id === t.id)) {
+              toggleFavorite(t);
+              added++;
+            }
+          }
+          const skipped = clipboardTracks.length - added;
+          showToast(skipped > 0 ? `${added} tracks added, ${skipped} duplicates skipped` : `${added} tracks added`);
+          return;
+        }
+        const existing = new Set(displayedTracks.map((t) => t.id));
+        const toAdd = clipboardTracks.filter((t) => !existing.has(t.id));
+        if (toAdd.length > 0) {
+          useLibraryStore.getState().addTracksToPlaylist(id, toAdd);
+          if (cutFromPlaylistId && cutFromPlaylistId !== id) {
+            removeMultipleFromPlaylist(cutFromPlaylistId, new Set(toAdd.map((t) => t.id)));
+          }
+        }
+        const skipped = clipboardTracks.length - toAdd.length;
+        showToast(
+          skipped > 0
+            ? `${toAdd.length} tracks added, ${skipped} duplicates skipped`
+            : `${toAdd.length} tracks added`
+        );
+        return;
+      }
+      if (e.key === 'Escape' && selectedIds.size > 0) {
+        setSelectedIds(new Set());
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [selectedIds, clipboardTracks, cutFromPlaylistId, isSpecial, id, copyTracks, cutTracks, showToast, removeMultipleFromPlaylist]);
   const [lastSelectedIdx, setLastSelectedIdx] = useState<number | null>(null);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -712,10 +782,40 @@ export function PlaylistDetailPage() {
                 Remove Selected
               </Button>
             )}
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                const sel = displayedTracks.filter((t) => selectedIds.has(t.id));
+                copyTracks(sel);
+                showToast(`${sel.length} tracks copied`);
+              }}
+            >
+              Copy
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                const sel = displayedTracks.filter((t) => selectedIds.has(t.id));
+                sel.forEach((t) => {
+                  if (!favorites.some((f) => f.id === t.id)) toggleFavorite(t);
+                });
+                showToast(`Added ${sel.length} tracks to Liked Songs`);
+              }}
+            >
+              Like
+            </Button>
             <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}>
               Clear
             </Button>
           </div>
+        </div>
+      )}
+
+      {clipboardToast && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full bg-[#1a1a22] border border-white/15 text-xs text-white shadow-2xl">
+          {clipboardToast}
         </div>
       )}
 

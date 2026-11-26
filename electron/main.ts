@@ -34,6 +34,7 @@ import {
 
 // Force HTTP/2 over TCP instead of HTTP/3 QUIC to prevent net::ERR_QUIC_PROTOCOL_ERROR on long audio streams
 app.commandLine.appendSwitch('disable-quic');
+app.commandLine.appendSwitch('enable-features', 'HardwareMediaKeyHandling,MediaSessionService');
 
 process.env.DIST_ELECTRON = __dirname;
 process.env.DIST = join(__dirname, '../dist');
@@ -125,8 +126,59 @@ function createNocturneTrayIconDataUrl(): string {
   return `data:image/png;base64,${png.toString('base64')}`;
 }
 
+if (process.platform === 'win32') {
+  app.setAppUserModelId('com.nocturne.music');
+}
+
+function createPngNativeImage(
+  size: number,
+  pixel: (x: number, y: number) => [number, number, number, number]
+): Electron.NativeImage {
+  const raw = Buffer.alloc(size * (1 + size * 4));
+  for (let y = 0; y < size; y++) {
+    const row = y * (1 + size * 4);
+    raw[row] = 0;
+    for (let x = 0; x < size; x++) {
+      const [r, g, b, a] = pixel(x, y);
+      const off = row + 1 + x * 4;
+      raw[off] = r;
+      raw[off + 1] = g;
+      raw[off + 2] = b;
+      raw[off + 3] = a;
+    }
+  }
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(size, 0);
+  ihdr.writeUInt32BE(size, 4);
+  ihdr[8] = 8;
+  ihdr[9] = 6;
+  const png = Buffer.concat([
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+    pngChunk('IHDR', ihdr),
+    pngChunk('IDAT', deflateSync(raw)),
+    pngChunk('IEND', Buffer.alloc(0)),
+  ]);
+  return nativeImage.createFromBuffer(png);
+}
+
+function getNocturneIcon(): Electron.NativeImage {
+  return createPngNativeImage(32, (x, y) => {
+    const dx = x - 15.5;
+    const dy = y - 15.5;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist > 15) return [0, 0, 0, 0];
+    // Crescent moon
+    const mx = x - 18.5;
+    const my = y - 13.5;
+    const mDist = Math.sqrt(mx * mx + my * my);
+    if (dist <= 9.5 && mDist >= 7.2) return [255, 255, 255, 255];
+    return [18, 18, 24, 255];
+  });
+}
+
 function createWindow(): void {
   mainWindow = new BrowserWindow({
+    icon: getNocturneIcon(),
     width: 1400,
     height: 900,
     minWidth: 900,
@@ -145,8 +197,52 @@ function createWindow(): void {
 
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
 
+function updateThumbarButtons(isPlaying: boolean): void {
+  if (process.platform !== 'win32' || !mainWindow || mainWindow.isDestroyed()) return;
+  const prevIcon = createPngNativeImage(16, (x, y) => {
+    if (x >= 3 && x <= 4 && y >= 3 && y <= 12) return [255, 255, 255, 255];
+    if (x >= 6 && x <= 12 && Math.abs(y - 7.5) <= (x - 6) * 0.75) return [255, 255, 255, 255];
+    return [0, 0, 0, 0];
+  });
+  const playIcon = createPngNativeImage(16, (x, y) => {
+    if (x >= 4 && x <= 12 && Math.abs(y - 7.5) <= (12 - x) * 0.65) return [255, 255, 255, 255];
+    return [0, 0, 0, 0];
+  });
+  const pauseIcon = createPngNativeImage(16, (x, y) => {
+    if (((x >= 4 && x <= 6) || (x >= 9 && x <= 11)) && y >= 3 && y <= 12) return [255, 255, 255, 255];
+    return [0, 0, 0, 0];
+  });
+  const nextIcon = createPngNativeImage(16, (x, y) => {
+    if (x >= 11 && x <= 12 && y >= 3 && y <= 12) return [255, 255, 255, 255];
+    if (x >= 3 && x <= 9 && Math.abs(y - 7.5) <= (9 - x) * 0.75) return [255, 255, 255, 255];
+    return [0, 0, 0, 0];
+  });
+  mainWindow.setThumbarButtons([
+    {
+      tooltip: 'Previous',
+      icon: prevIcon,
+      click: () => mainWindow?.webContents.send('media-key', 'previous'),
+    },
+    {
+      tooltip: isPlaying ? 'Pause' : 'Play',
+      icon: isPlaying ? pauseIcon : playIcon,
+      click: () => mainWindow?.webContents.send('media-key', 'play-pause'),
+    },
+    {
+      tooltip: 'Next',
+      icon: nextIcon,
+      click: () => mainWindow?.webContents.send('media-key', 'next'),
+    },
+  ]);
+}
+
+ipcMain.on('thumbar-playback-state', (_event, isPlaying: boolean) => {
+  updateThumbarButtons(Boolean(isPlaying));
+});
+
   mainWindow.on('ready-to-show', () => {
     mainWindow?.show();
+    updateThumbarButtons(false);
   });
 
   mainWindow.on('maximize', () => {
@@ -186,7 +282,7 @@ function registerGlobalShortcuts(): void {
 }
 
 function createTray(): void {
-  const icon = nativeImage.createFromDataURL(createNocturneTrayIconDataUrl());
+  const icon = getNocturneIcon();
   tray = new Tray(icon);
   const contextMenu = Menu.buildFromTemplate([
     { label: 'Show Nocturne', click: () => mainWindow?.show() },

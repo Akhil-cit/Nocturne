@@ -128,10 +128,10 @@ const VirtualTrackRow = memo(function VirtualTrackRow({
       onContextMenu={(e) => onOpenMenu(e, track, index)}
       className={`group grid grid-cols-[36px_1fr_0.7fr_90px_76px] items-center gap-3 px-3 rounded-xl transition-colors select-none ${
         isSelected
-          ? 'bg-white/12'
+          ? 'bg-white/[0.14] rounded-none'
           : isCurrent
-            ? 'bg-white/[0.08]'
-            : 'hover:bg-white/[0.05]'
+            ? 'bg-white/[0.08] rounded-lg'
+            : 'hover:bg-white/[0.05] rounded-lg'
       } ${unavailable ? 'opacity-55' : ''}`}
     >
       {/* Index / Select / Play */}
@@ -139,30 +139,19 @@ const VirtualTrackRow = memo(function VirtualTrackRow({
         {allowReorder && (
           <GripVertical className="w-3 h-3 text-white/20 opacity-0 group-hover:opacity-100 cursor-grab shrink-0" />
         )}
-        {onToggleSelect && (
-          <button
-            type="button"
-            onClick={(e) => {
+        <button
+          type="button"
+          disabled={unavailable}
+          onClick={(e) => {
+            if (e.ctrlKey || e.metaKey || e.shiftKey) {
               e.stopPropagation();
-              onToggleSelect(track.id, e.shiftKey);
-            }}
-            aria-label={`Select ${track.title}`}
-            className={`w-4 h-4 rounded border flex items-center justify-center transition-opacity cursor-pointer ${
-              isSelected
-                ? 'bg-white border-white text-black opacity-100'
-                : 'border-white/25 opacity-0 group-hover:opacity-100'
-            }`}
-          >
-            {isSelected && <Check className="w-3 h-3" />}
-          </button>
-        )}
-        {!isSelected && (
-          <button
-            type="button"
-            disabled={unavailable}
-            onClick={() => onRowPlay(track, index)}
-            aria-label={isCurrent && isPlaying ? `Pause ${track.title}` : `Play ${track.title}`}
-            className="w-6 h-6 flex items-center justify-center text-xs text-white/45 group-hover:text-white cursor-pointer disabled:cursor-not-allowed"
+              onToggleSelect?.(track.id, e.shiftKey);
+              return;
+            }
+            onRowPlay(track, index);
+          }}
+          aria-label={isCurrent && isPlaying ? `Pause ${track.title}` : `Play ${track.title}`}
+          className="w-6 h-6 flex items-center justify-center text-xs text-white/45 group-hover:text-white cursor-pointer disabled:cursor-not-allowed"
           >
             <span className="group-hover:hidden tabular-nums">{index + 1}</span>
             <span className="hidden group-hover:flex items-center justify-center">
@@ -173,7 +162,6 @@ const VirtualTrackRow = memo(function VirtualTrackRow({
               )}
             </span>
           </button>
-        )}
       </div>
 
       {/* Artwork + Title + Artist */}

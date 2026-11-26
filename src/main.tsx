@@ -10,6 +10,8 @@ const params = new URLSearchParams(window.location.search);
 // Wire listening history integration (only in main app window, not overlay/mini)
 if (!params.get('overlay') && !params.get('mini')) {
   void import('@/services/history/listeningSessionIntegration');
+  void import('@/services/playback/sessionPersistence').then((m) => m.initSessionPersistence());
+  void import('@/stores/analyticsStore').then((m) => m.initGlobalAnalytics());
 }
 const isOverlay = params.get('overlay') === '1';
 const isMini = params.get('mini') === '1';

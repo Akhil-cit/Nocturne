@@ -1,5 +1,7 @@
 import { useEffect, useState, type MouseEvent } from 'react';
-import { Heart, ListPlus, Music, Pause, Play } from 'lucide-react';
+import { Heart, ListPlus, MoreHorizontal, Music, Pause, Play } from 'lucide-react';
+import PlaylistPickerModal from '@/components/ui/PlaylistPickerModal';
+import TrackContextMenu from '@/components/ui/TrackContextMenu';
 import type { Track } from '@/services/music/types';
 import { usePlayerStore } from '@/stores/playerStore';
 
@@ -43,20 +45,7 @@ export function TrackList({
 
   const [externalError, setExternalError] = useState('');
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
-
-  useEffect(() => {
-    if (!menu) return;
-    const handleClose = () => setMenu(null);
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setMenu(null);
-    };
-    window.addEventListener('click', handleClose);
-    window.addEventListener('keydown', handleKey);
-    return () => {
-      window.removeEventListener('click', handleClose);
-      window.removeEventListener('keydown', handleKey);
-    };
-  }, [menu]);
+  const [pickerTrack, setPickerTrack] = useState<Track | null>(null);
 
   const handleRowPlay = (track: Track, index: number) => {
     if (currentTrack?.id === track.id) {
@@ -241,62 +230,36 @@ export function TrackList({
                 <span className="text-xs text-white/45 tabular-nums">
                   {formatDuration(track.duration)}
                 </span>
+                <button
+                  type="button"
+                  data-testid="track-more-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleContextMenu(e as unknown as React.MouseEvent<HTMLDivElement>, track, index);
+                  }}
+                  aria-label="More options"
+                  title="More options"
+                  className="p-1 rounded-full opacity-0 group-hover:opacity-100 focus:opacity-100 text-white/45 hover:text-white transition-opacity cursor-pointer"
+                >
+                  <MoreHorizontal className="w-4 h-4" />
+                </button>
               </div>
             </div>
           );
         })}
       </div>
 
-      {/* Context Menu */}
-      {menu && (
-        <div
-          className="fixed z-50 min-w-[180px] rounded-xl bg-[#141414]/95 backdrop-blur-xl border border-white/12 p-1.5 shadow-2xl shadow-black/70"
-          style={{ left: menu.x, top: menu.y }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button
-            type="button"
-            onClick={() => {
-              handleRowPlay(menu.track, menu.index);
-              setMenu(null);
-            }}
-            className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-white/85 hover:text-white hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
-          >
-            <Play className="w-3.5 h-3.5" />
-            Play now
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              addToQueue(menu.track);
-              setMenu(null);
-            }}
-            className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-white/85 hover:text-white hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
-          >
-            <ListPlus className="w-3.5 h-3.5" />
-            Add to queue
-          </button>
-          {onToggleFavorite && (
-            <button
-              type="button"
-              onClick={() => {
-                onToggleFavorite(menu.track);
-                setMenu(null);
-              }}
-              className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-white/85 hover:text-white hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
-            >
-              <Heart
-                className={`w-3.5 h-3.5 ${
-                  favorites?.has(menu.track.id) ? 'fill-current text-white' : ''
-                }`}
-              />
-              {favorites?.has(menu.track.id)
-                ? 'Remove from favorites'
-                : 'Add to favorites'}
-            </button>
-          )}
-        </div>
-      )}
+      {/* Portal-based Context Menu & Playlist Picker */}
+      <TrackContextMenu
+        track={menu ? menu.track : null}
+        position={menu ? { x: menu.x, y: menu.y } : null}
+        onClose={() => setMenu(null)}
+        onAddToPlaylist={(t) => setPickerTrack(t)}
+      />
+      <PlaylistPickerModal
+        track={pickerTrack}
+        onClose={() => setPickerTrack(null)}
+      />
     </div>
   );
 }

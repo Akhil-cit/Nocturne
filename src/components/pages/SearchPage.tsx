@@ -5,6 +5,7 @@ import { Disc, ListMusic, Music, Search, User, X } from 'lucide-react';
 import { librarySuggestions } from '@/services/music/libraryDiscovery';
 import { useLibraryStore } from '@/stores/libraryStore';
 import TrackList from '@/components/ui/TrackList';
+import ArtworkImage from '@/components/ui/ArtworkImage';
 import { musicProviderManager } from '@/services/music/provider';
 import type { Album, Artist, OnlinePlaylist, SearchCategory, Track } from '@/services/music/types';
 import { usePlayerStore } from '@/stores/playerStore';
@@ -374,16 +375,13 @@ export function SearchPage() {
                     className="group p-3 rounded-2xl bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.06] text-center transition-all cursor-pointer"
                   >
                     <div className="w-24 h-24 mx-auto rounded-full bg-white/5 border border-white/10 overflow-hidden mb-3 flex items-center justify-center">
-                      {artist.picture ? (
-                        <img
-                          src={artist.picture}
-                          alt={artist.name}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <User className="w-8 h-8 text-white/25" />
-                      )}
+                      <ArtworkImage
+                        src={artist.picture}
+                        alt={artist.name}
+                        type="artist"
+                        title={artist.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
                     </div>
                     <p className="text-sm font-medium text-white truncate">
                       {artist.name}
@@ -419,16 +417,14 @@ export function SearchPage() {
                     className="group p-3 rounded-2xl bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.06] text-left transition-all cursor-pointer"
                   >
                     <div className="w-full aspect-square rounded-xl bg-white/5 border border-white/10 overflow-hidden mb-3 flex items-center justify-center">
-                      {album.cover ? (
-                        <img
-                          src={album.cover}
-                          alt={album.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <Disc className="w-8 h-8 text-white/25" />
-                      )}
+                      <ArtworkImage
+                        src={album.cover}
+                        alt={album.title}
+                        type="album"
+                        title={album.title}
+                        artist={album.artist}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
                     </div>
                     <p className="text-sm font-medium text-white truncate">
                       {album.title}
@@ -466,16 +462,13 @@ export function SearchPage() {
                     className="group p-3 rounded-2xl bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.06] text-left transition-all cursor-pointer"
                   >
                     <div className="w-full aspect-square rounded-xl bg-white/5 border border-white/10 overflow-hidden mb-3 flex items-center justify-center">
-                      {pl.cover ? (
-                        <img
-                          src={pl.cover}
-                          alt={pl.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <ListMusic className="w-8 h-8 text-white/25" />
-                      )}
+                      <ArtworkImage
+                        src={pl.cover}
+                        alt={pl.title}
+                        type="playlist"
+                        title={pl.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
                     </div>
                     <p className="text-sm font-medium text-white truncate">{pl.title}</p>
                     <p className="text-xs text-white/45 truncate mt-0.5">

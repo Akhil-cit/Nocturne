@@ -156,6 +156,8 @@ const electronAPI = {
       ipcRenderer.removeListener('maximize-change', handler);
     };
   },
+  setThumbarPlaybackState: (isPlaying: boolean) =>
+    ipcRenderer.send('thumbar-playback-state', isPlaying),
   onMediaKey: (callback: (key: string) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, key: string) =>
       callback(key);

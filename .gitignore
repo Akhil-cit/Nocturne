@@ -39,3 +39,4 @@ Thumbs.db
 .idea/
 
 release*/
+*.nocturne-backup

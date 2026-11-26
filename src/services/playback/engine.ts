@@ -835,6 +835,19 @@ export class PlaybackEngine extends EventTarget {
     }
   }
 
+  public seekWhenReady(trackId: string, time: number): void {
+    if (!Number.isFinite(time) || time <= 0) return;
+    const apply = () => {
+      if (this.getCurrentTrack()?.id !== trackId) return;
+      this.seekTo(time);
+    };
+    if (this.audio.readyState >= 3) {
+      apply();
+    } else {
+      this.audio.addEventListener('canplay', apply, { once: true });
+    }
+  }
+
   public setVolume(volume: number): void {
     const clamped = Math.max(0, Math.min(1, volume));
     this.volume = clamped;

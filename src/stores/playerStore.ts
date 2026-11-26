@@ -3,6 +3,7 @@ import { lookupLyrics } from '../services/lyrics/providers';
 import { lyricSyncEngine } from '../services/lyrics/sync';
 import type { RepeatMode, ResolvedStream, SyncedLyrics, Track } from '../services/music/types';
 import { playbackEngine, type PlaybackStatus } from '../services/playback/engine';
+import { consumePendingRestoreTime } from '../services/playback/sessionPersistence';
 
 export interface PlayerState {
   currentTrack: Track | null;
@@ -131,6 +132,17 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
 
   toggle: async () => {
     set({ error: null });
+    const state = get();
+    const engineTrack = playbackEngine.getCurrentTrack();
+    if (!state.isPlaying && state.currentTrack && engineTrack?.id !== state.currentTrack.id) {
+      const targetTrack = state.currentTrack;
+      const restoreSec = consumePendingRestoreTime();
+      await get().play(targetTrack);
+      if (restoreSec && restoreSec > 0) {
+        playbackEngine.seekWhenReady(targetTrack.id, restoreSec);
+      }
+      return;
+    }
     await playbackEngine.toggle();
   },
 

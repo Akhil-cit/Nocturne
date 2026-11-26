@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import {
+  BarChart2,
   Disc3,
   Home,
   Library,
@@ -15,6 +16,7 @@ const navItems = [
   { to: '/', label: 'Home', icon: Home, end: true },
   { to: '/search', label: 'Search', icon: Search, end: false },
   { to: '/library', label: 'Your Library', icon: Library, end: false },
+  { to: '/insights', label: 'Insights', icon: BarChart2, end: false },
   { to: '/now-playing', label: 'Now Playing', icon: Disc3, end: false },
   { to: '/studio', label: 'Visualization Studio', icon: SlidersHorizontal, end: false },
   { to: '/settings', label: 'Settings', icon: Settings, end: false },

@@ -16,6 +16,8 @@ import {
   VolumeX,
 } from 'lucide-react';
 import Slider from '@/components/ui/Slider';
+import SleepTimerButton from '@/components/ui/SleepTimerButton';
+import ArtworkImage from '@/components/ui/ArtworkImage';
 import { lyricSyncEngine } from '@/services/lyrics/sync';
 import { useLightingStore } from '@/stores/lightingStore';
 import { usePlayerStore } from '@/stores/playerStore';
@@ -143,6 +145,10 @@ export function PlayerBar() {
     }
   };
 
+  useEffect(() => {
+    (window.electronAPI as { setThumbarPlaybackState?: (p: boolean) => void } | undefined)?.setThumbarPlaybackState?.(isPlaying);
+  }, [isPlaying]);
+
   return (
     <footer className="fixed bottom-0 left-0 right-0 h-20 z-40 px-4 bg-[#0e0e0e]/85 backdrop-blur-2xl border-t border-white/[0.08] flex items-center justify-between gap-4 select-none">
       {/* Left: Track Info */}
@@ -153,11 +159,16 @@ export function PlayerBar() {
           aria-label="Open Now Playing"
           className="w-12 h-12 rounded-lg bg-white/5 border border-white/10 overflow-hidden shrink-0 flex items-center justify-center hover:border-white/25 transition-colors cursor-pointer"
         >
-          {currentTrack?.cover ? (
-            <img
+          {currentTrack ? (
+            <ArtworkImage
+              key={currentTrack.id}
               src={currentTrack.cover}
               alt={currentTrack.title}
+              type="track"
+              title={currentTrack.title}
+              artist={currentTrack.artist}
               className="w-full h-full object-cover"
+              iconClassName="w-5 h-5 text-white/30"
             />
           ) : (
             <Music className="w-5 h-5 text-white/30" />
@@ -298,6 +309,8 @@ export function PlayerBar() {
         >
           <PictureInPicture2 className="w-4 h-4" />
         </button>
+
+        <SleepTimerButton align="up" />
 
         <button
           type="button"

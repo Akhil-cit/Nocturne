@@ -5,6 +5,7 @@ import { musicProviderManager } from '@/services/music/provider';
 import type { AlbumDetail, Track } from '@/services/music/types';
 import { usePlayerStore } from '@/stores/playerStore';
 import { useLibraryStore } from '@/stores/libraryStore';
+import ArtworkImage from '@/components/ui/ArtworkImage';
 
 function formatTotalDuration(seconds: number): string {
   const mins = Math.floor(seconds / 60);
@@ -107,11 +108,15 @@ export function AlbumPage() {
       {/* Album Header */}
       <div className="flex flex-col sm:flex-row items-center sm:items-end gap-6">
         <div className="w-44 h-44 rounded-2xl overflow-hidden bg-white/[0.06] border border-white/10 shrink-0 flex items-center justify-center shadow-2xl">
-          {album.cover ? (
-            <img src={album.cover} alt={album.title} className="w-full h-full object-cover" />
-          ) : (
-            <Disc3 className="w-16 h-16 text-white/25" />
-          )}
+          <ArtworkImage
+            src={album.cover}
+            alt={album.title}
+            type="album"
+            title={album.title}
+            artist={album.artist}
+            className="w-full h-full object-cover"
+            iconClassName="w-16 h-16 text-white/25"
+          />
         </div>
         <div className="space-y-2.5 text-center sm:text-left">
           <span className="text-[11px] uppercase tracking-widest text-white/45 font-medium">

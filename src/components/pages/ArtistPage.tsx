@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Disc3, Heart, Play, Radio, Shuffle, User } from 'lucide-react';
 import { musicProviderManager } from '@/services/music/provider';
+import { getArtistRadio } from '@/services/music/recommendationService';
 import type { ArtistDetail, Track } from '@/services/music/types';
 import { usePlayerStore } from '@/stores/playerStore';
 import { useLibraryStore } from '@/stores/libraryStore';
+import ArtworkImage from '@/components/ui/ArtworkImage';
 
 export function ArtistPage() {
   const { id } = useParams<{ id: string }>();
@@ -104,11 +106,14 @@ export function ArtistPage() {
       {/* Artist Header */}
       <div className="flex flex-col sm:flex-row items-center sm:items-end gap-6">
         <div className="w-36 h-36 sm:w-44 sm:h-44 rounded-full overflow-hidden bg-white/[0.06] border border-white/10 shrink-0 flex items-center justify-center shadow-2xl">
-          {artist.picture ? (
-            <img src={artist.picture} alt={artist.name} className="w-full h-full object-cover" />
-          ) : (
-            <User className="w-16 h-16 text-white/25" />
-          )}
+          <ArtworkImage
+            src={artist.picture}
+            alt={artist.name}
+            type="artist"
+            title={artist.name}
+            className="w-full h-full object-cover"
+            iconClassName="w-16 h-16 text-white/25"
+          />
         </div>
         <div className="space-y-3 text-center sm:text-left">
           <span className="text-[11px] uppercase tracking-widest text-white/45 font-medium">
@@ -136,7 +141,16 @@ export function ArtistPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => handlePlayAll(true)}
+                  data-testid="artist-radio-btn"
+                  onClick={() => {
+                    void getArtistRadio(artist.name).then((radio) => {
+                      const list = radio.length > 0 ? radio : artist.topTracks;
+                      if (list.length > 0) {
+                        setQueue(list, 0);
+                        void play(list[0]);
+                      }
+                    });
+                  }}
                   className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-white/[0.08] hover:bg-white/15 text-xs font-medium text-white cursor-pointer"
                 >
                   <Radio className="w-3.5 h-3.5" /> Artist Radio
